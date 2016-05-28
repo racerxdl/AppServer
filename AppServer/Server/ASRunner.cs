@@ -24,7 +24,6 @@ namespace AppServer.Server {
 
     public void run() {
       server.Run();
-      appManager.loadApplication("sampleapp");
       Console.ReadLine();
     }
     RestResult processHttpCalls(HttpListenerRequest request) {
