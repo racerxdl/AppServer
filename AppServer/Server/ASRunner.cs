@@ -17,6 +17,7 @@ namespace AppServer.Server {
     public ASRunner() {
       server = new HttpServer("http://localhost:8080/", processHttpCalls);
       processor = new RestProcessor(Assembly.GetExecutingAssembly(), "AppServer.Modules");
+      Console.WindowWidth = 180;
     }
 
     public void run() {

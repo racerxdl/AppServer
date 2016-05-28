@@ -2,14 +2,14 @@
 
 namespace ASAttrib.Attributes {
   [AttributeUsage(AttributeTargets.Method)]
-  public class GET : Attribute, HTTPMethod {
+  public class DELETE : Attribute, HTTPMethod {
     private string path;
-    public GET(string path) {
+    public DELETE(string path) {
       this.path = path;
     }
 
     public string Method {
-      get { return "GET"; }
+      get { return "DELETE"; }
     }
 
     public string Path {

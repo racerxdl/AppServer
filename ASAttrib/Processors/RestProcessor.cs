@@ -1,4 +1,5 @@
 ﻿using ASAttrib.Attributes;
+using ASAttrib.Exceptions;
 using ASAttrib.Models;
 using ASTools.Logger;
 using Newtonsoft.Json;
@@ -11,10 +12,9 @@ namespace ASAttrib.Processors {
   public class RestProcessor {
     private static Logger LOG = new Logger(typeof(RestProcessor));
 
-    private readonly Type[] RestTypes = new Type[] { typeof(GET), typeof(POST) };
+    private readonly Type[] RestTypes = new Type[] { typeof(GET), typeof(POST), typeof(PUT), typeof(DELETE) };
 
     private Dictionary<string, Dictionary<string, RestCall>> endpoints;
-    //private Dictionary<string, List<RestCall>> endpoints;
     private Dictionary<string, object> instances;
 
     public RestProcessor(Assembly runningAssembly, string modulesAssembly) {
@@ -35,13 +35,17 @@ namespace ASAttrib.Processors {
               Attribute rta = methodInfo.GetCustomAttribute(rt);
               if (rta != null) {
                 RestCall restCall = new RestCall();
-                restCall.methodClass = tClass;
-                restCall.call = methodInfo;
-                restCall.method = (HTTPMethod)rta;
+                try {
+                  restCall.methodClass = tClass;
+                  restCall.call = methodInfo;
+                  restCall.method = (HTTPMethod)rta;
 
-                LOG.i("     Registering method " + methodInfo.Name + " for " + restCall.method.Method + " " + restCall.method.Path);
+                  LOG.i("     Registering method " + methodInfo.Name + " for " + restCall.method.Method + " " + restCall.method.Path);
 
-                addEndpoint(restCall);
+                  addEndpoint(restCall);
+                } catch (DuplicateRestMethodException) {
+                  LOG.e("DuplicateRestMethodException: There is already a " + restCall.method.Method + " for " + restCall.method.Path + " registered.");
+                }
               }
             }
           }
@@ -84,7 +88,7 @@ namespace ASAttrib.Processors {
       }
 
       if (endpoints[path].ContainsKey(restCall.method.Method)) {
-        throw new DuplicateWaitObjectException();
+        throw new DuplicateRestMethodException();
       }
 
       endpoints[path][restCall.method.Method] = restCall;

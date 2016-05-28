@@ -22,6 +22,8 @@ namespace ASTools.Logger {
       ConsoleColor.DarkGray   // Debug
     };
 
+    private static readonly string logFormat = "{0,-19} - {1, -40} - {2, -6}: {3}";
+
     private static LogManager instance;
 
     public static void initialize(string logFolder, LogLevel logLevel) {
@@ -57,11 +59,11 @@ namespace ASTools.Logger {
           fileStream = new FileStream(logFilePath, FileMode.Append);
         }
         log = new StreamWriter(fileStream);
-        log.WriteLine(System.DateTime.Now.ToString() + " - " + className + " - " + level.ToString() + "/" + strLog);
+        log.WriteLine(String.Format(logFormat, DateTime.Now.ToString(), className, level.ToString(), strLog));
         log.Close();
 
         Console.ForegroundColor = logColors[(int)level];
-        Console.WriteLine(System.DateTime.Now.ToString() + " - " + className + "/" + level.ToString() + " - " + strLog);
+        Console.WriteLine(String.Format(logFormat, DateTime.Now.ToString(), className, level.ToString(), strLog));
         Console.ResetColor();
       }
     }

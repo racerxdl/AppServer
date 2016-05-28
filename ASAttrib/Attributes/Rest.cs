@@ -1,12 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ASAttrib.Attributes {
   [AttributeUsage(AttributeTargets.Class) ]
   public class Rest : Attribute {
+    private string path;
+    public Rest(string path) {
+      this.path = path;
+    }
 
+    public string Path {
+      get { return path; }
+    }
   }
 }

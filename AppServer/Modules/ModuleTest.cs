@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace AppServer.Modules {
-  [Rest, Path("/hue")]
+  [Rest("/hue")]
   public class ModuleTest {
 
     [GET("/test")]
@@ -18,6 +18,15 @@ namespace AppServer.Modules {
 
     [POST("/test")]
     public TestModel hueTest2(HttpListenerRequest request) {
+      TestModel x = new TestModel();
+      x.name = "Lucas";
+      x.count = 10;
+      x.test = "HUEHUE";
+      return x;
+    }
+
+    [POST("/test")]
+    public TestModel hueTest3(HttpListenerRequest request) {
       TestModel x = new TestModel();
       x.name = "Lucas";
       x.count = 10;

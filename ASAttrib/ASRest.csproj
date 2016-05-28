@@ -44,9 +44,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Attributes\DELETE.cs" />
     <Compile Include="Attributes\HTTPMethod.cs" />
     <Compile Include="Attributes\POST.cs" />
     <Compile Include="Attributes\GET.cs" />
+    <Compile Include="Attributes\PUT.cs" />
     <Compile Include="Attributes\Rest.cs" />
     <Compile Include="Exceptions\DuplicateRestMethodException.cs" />
     <Compile Include="Models\RestCall.cs" />
