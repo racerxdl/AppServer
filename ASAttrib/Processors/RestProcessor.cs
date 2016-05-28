@@ -1,0 +1,93 @@
+﻿using ASAttrib.Attributes;
+using ASAttrib.Models;
+using ASTools.Logger;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Reflection;
+
+namespace ASAttrib.Processors {
+  public class RestProcessor {
+    private static Logger LOG = new Logger(typeof(RestProcessor));
+
+    private readonly Type[] RestTypes = new Type[] { typeof(GET), typeof(POST) };
+
+    private Dictionary<string, Dictionary<string, RestCall>> endpoints;
+    //private Dictionary<string, List<RestCall>> endpoints;
+    private Dictionary<string, object> instances;
+
+    public RestProcessor(Assembly runningAssembly, string modulesAssembly) {
+      endpoints = new Dictionary<string, Dictionary<string, RestCall>>();
+      instances = new Dictionary<string, object>();
+
+      Type[] typelist = Tools.GetTypesInNamespace(runningAssembly, modulesAssembly);
+      for (int i = 0; i < typelist.Length; i++) {
+        Type tClass = typelist[i];
+        Attribute t = tClass.GetCustomAttribute(typeof(Rest));
+        if (t != null) {
+          LOG.i("Found REST class " + tClass.Name);
+          object instance = Activator.CreateInstance(tClass);
+          instances.Add(tClass.Name, instance);
+          MethodInfo[] methods = tClass.GetMethods();
+          foreach (var methodInfo in methods) {
+            foreach (Type rt in RestTypes) {
+              Attribute rta = methodInfo.GetCustomAttribute(rt);
+              if (rta != null) {
+                RestCall restCall = new RestCall();
+                restCall.methodClass = tClass;
+                restCall.call = methodInfo;
+                restCall.method = (HTTPMethod)rta;
+
+                LOG.i("     Registering method " + methodInfo.Name + " for " + restCall.method.Method + " " + restCall.method.Path);
+
+                addEndpoint(restCall);
+              }
+            }
+          }
+        }
+      }
+
+      LOG.i("Initialized " + instances.Count + " REST instances.");
+      LOG.i("Initialized " + endpoints.Keys.Count + " REST endpoints.");
+    }
+
+    public RestCall getEndPoint(string path, string method) {
+      if (endpoints.ContainsKey(path) && endpoints[path].ContainsKey(method)) {
+        return endpoints[path][method];
+      }
+
+      return null;
+    }
+
+    public RestResult callEndPoint(string path, string method, HttpListenerRequest request) {
+      RestCall rc = getEndPoint(path, method);
+      if (instances.ContainsKey(rc.methodClass.Name)) {
+        object ret = rc.call.Invoke(instances[rc.methodClass.Name], new object[] { request });
+        if (ret is string) {
+          return new RestResult((string)ret);
+        } else {
+          return new RestResult(JsonConvert.SerializeObject(ret), "application/json");
+        }
+      }
+      return new RestResult("Not found", "text/plain", HttpStatusCode.NotFound);
+    }
+
+    public bool containsEndPoint(string path, string method) {
+      return endpoints.ContainsKey(path) && endpoints[path].ContainsKey(method);
+    }
+
+    private void addEndpoint(RestCall restCall) {
+      string path = restCall.method.Path;
+      if (!endpoints.ContainsKey(path)) {
+        endpoints.Add(path, new Dictionary<string, RestCall>());
+      }
+
+      if (endpoints[path].ContainsKey(restCall.method.Method)) {
+        throw new DuplicateWaitObjectException();
+      }
+
+      endpoints[path][restCall.method.Method] = restCall;
+    }
+  }
+}
