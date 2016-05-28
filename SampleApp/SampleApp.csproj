@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{A98DE288-9DD0-46E1-854A-9AAB9091547B}</ProjectGuid>
+    <ProjectGuid>{FBBDCCDB-5F07-4B4E-B7B1-09DE7504A5D1}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ASAttrib</RootNamespace>
-    <AssemblyName>ASAttrib</AssemblyName>
+    <RootNamespace>SampleApp</RootNamespace>
+    <AssemblyName>SampleApp</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -30,10 +30,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json, Version=8.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <HintPath>..\packages\Newtonsoft.Json.8.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -44,24 +40,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Attributes\DELETE.cs" />
-    <Compile Include="Attributes\HTTPMethod.cs" />
-    <Compile Include="Attributes\POST.cs" />
-    <Compile Include="Attributes\GET.cs" />
-    <Compile Include="Attributes\PUT.cs" />
-    <Compile Include="Attributes\Rest.cs" />
-    <Compile Include="Exceptions\DuplicateRestMethodException.cs" />
-    <Compile Include="Models\RestCall.cs" />
-    <Compile Include="Models\RestRequest.cs" />
-    <Compile Include="Models\RestResult.cs" />
-    <Compile Include="Processors\RestProcessor.cs" />
-    <Compile Include="Processors\Tools.cs" />
+    <Compile Include="MyRestSample.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TestModel.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
+    <ProjectReference Include="..\ASAttrib\ASRest.csproj">
+      <Project>{a98de288-9dd0-46e1-854a-9aab9091547b}</Project>
+      <Name>ASRest</Name>
+    </ProjectReference>
     <ProjectReference Include="..\ASTools\ASTools.csproj">
       <Project>{47ad25a1-d8e2-4cb8-a111-2b55380f83b1}</Project>
       <Name>ASTools</Name>

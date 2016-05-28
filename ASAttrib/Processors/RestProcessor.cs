@@ -17,10 +17,12 @@ namespace ASAttrib.Processors {
     private Dictionary<string, Dictionary<string, RestCall>> endpoints;
     private Dictionary<string, object> instances;
 
-    public RestProcessor(Assembly runningAssembly, string modulesAssembly) {
+    public RestProcessor() {
       endpoints = new Dictionary<string, Dictionary<string, RestCall>>();
       instances = new Dictionary<string, object>();
+    }
 
+    public void init(Assembly runningAssembly, string modulesAssembly) {
       Type[] typelist = Tools.GetTypesInNamespace(runningAssembly, modulesAssembly);
       for (int i = 0; i < typelist.Length; i++) {
         Type tClass = typelist[i];
@@ -64,7 +66,7 @@ namespace ASAttrib.Processors {
       return null;
     }
 
-    public RestResult callEndPoint(string path, string method, HttpListenerRequest request) {
+    public RestResult callEndPoint(string path, string method, RestRequest request) {
       RestCall rc = getEndPoint(path, method);
       if (instances.ContainsKey(rc.methodClass.Name)) {
         object ret = rc.call.Invoke(instances[rc.methodClass.Name], new object[] { request });

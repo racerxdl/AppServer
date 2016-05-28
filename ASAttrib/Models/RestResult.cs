@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace ASAttrib.Models {
+  [Serializable]
   public class RestResult {
     private HttpStatusCode statusCode;
     private string contentType;

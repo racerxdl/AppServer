@@ -48,7 +48,7 @@ namespace ASTools.Logger {
         DirectoryInfo logDirInfo = null;
         FileInfo logFileInfo;
 
-        string logFilePath = this.logFolder + "Log-" + System.DateTime.Today.ToString("MM-dd-yyyy") + "." + "txt";
+        string logFilePath = this.logFolder + "Log-" + System.DateTime.Today.ToString("MM-dd-yyyy") + "-" + AppDomain.CurrentDomain.FriendlyName + "." + "txt";
         logFileInfo = new FileInfo(logFilePath);
         logDirInfo = new DirectoryInfo(logFileInfo.DirectoryName);
         if (!logDirInfo.Exists)

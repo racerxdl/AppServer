@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ASRest", "ASAttrib\ASRest.c
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ASTools", "ASTools\ASTools.csproj", "{47AD25A1-D8E2-4CB8-A111-2B55380F83B1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleApp", "SampleApp\SampleApp.csproj", "{FBBDCCDB-5F07-4B4E-B7B1-09DE7504A5D1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{47AD25A1-D8E2-4CB8-A111-2B55380F83B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{47AD25A1-D8E2-4CB8-A111-2B55380F83B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{47AD25A1-D8E2-4CB8-A111-2B55380F83B1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FBBDCCDB-5F07-4B4E-B7B1-09DE7504A5D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FBBDCCDB-5F07-4B4E-B7B1-09DE7504A5D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FBBDCCDB-5F07-4B4E-B7B1-09DE7504A5D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FBBDCCDB-5F07-4B4E-B7B1-09DE7504A5D1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

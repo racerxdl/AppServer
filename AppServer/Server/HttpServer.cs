@@ -7,7 +7,7 @@ using System.Net;
 using System.Threading;
 
 namespace AppServer.Server {
-  class HttpServer {
+  public class HttpServer {
     private readonly HttpListener _listener = new HttpListener();
     private Func<HttpListenerRequest, RestResult> httpProcesser;
     private string listenUrl;

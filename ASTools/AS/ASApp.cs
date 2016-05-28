@@ -4,7 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AppServer.Modules {
-  public class ModuleTest2 {
+namespace ASTools.AS {
+  public interface ASApp {
+    void load();
   }
 }
