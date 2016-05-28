@@ -41,7 +41,7 @@ namespace ASTools.Logger {
       this.logLevel = logLevel;
     }
 
-    public void WriteLog(string className, LogLevel level, string strLog) {
+    public async void WriteLog(string className, LogLevel level, string strLog) {
       if (level <= this.logLevel) {
         StreamWriter log;
         FileStream fileStream = null;
