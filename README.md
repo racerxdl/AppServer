@@ -35,6 +35,40 @@ The output `.dll` file should be put inside `apps/YOUR_APP_FOLDER` to be deploye
 
 The AppServer handles unhandled exceptions by logging and returning the `StackTrace` of the exception. If a `.pdb` file is available, it will also shows the source file and line number of the crash.
 
+How to use REST Attributes
+==========================
+
+This is actually pretty simple. Just create a Class and put the `REST("/mypath")` attribute on it to mark it as a REST Endpoint Class. In the methods of that class you can anotate with `GET("/endpoint")`, `POST("/endpoint")`, `PUT("/endpoint")`, `DELETE("/endpoint")`. The method should receive a `RestRequest` object that contains the Request Parameters and can return either `string` or a `object` that will be JSON serialized. The method can also throw an exception to indicate an error. The AppServer will return a HTTP Status Code 500 with the StackTrace as message. 
+
+The SampleApp Example:
+
+```cs
+namespace SampleApp {
+    [Rest("/hue")]
+    public class MyRestSample {
+        [GET("/test")]
+        public string hueTest(RestRequest request) {
+          return "GET TO HUEHUE";
+        }
+        
+        [POST("/test")]
+        public TestModel hueTest2(RestRequest request) {
+          TestModel x = new TestModel();
+          x.name = "Lucas";
+          x.count = 10;
+          x.test = "HUEHUE";
+          return x;
+        }
+        [GET("/exception-test")]
+        public TestModel exceptionTest(RestRequest request) {
+          throw new NullReferenceException("Test of an Exception");
+        }
+    }
+}
+```
+
+This will create the endpoints that will be described in the next section.
+
 Testing locally
 ===============
 
@@ -46,10 +80,9 @@ Testing locally
 
 You will have some endpoints available:
 
-*   `GET` **/test**
+*   `GET` **/sampleapp/hue/test**
     *   This will return a string `"GET TO HUEHUE"` as `text/plain`
-*   `POST` **/test**
+*   `POST` **/sampleapp/hue/test**
     *   This will return a JSON of `TestModel` with the fields `name` = `"Lucas"`, `count` = `10` and `test` = `"HUEHUE"`
-*   `GET` **/exception-test**
+*   `GET` **/sampleapp/hue/exception-test**
     *   This will throw a test `NullReferenceException` with the message `Test of an Exception`
-

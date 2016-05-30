@@ -29,6 +29,7 @@ namespace ASAttrib.Processors {
         Attribute t = tClass.GetCustomAttribute(typeof(Rest));
         if (t != null) {
           LOG.i("Found REST class " + tClass.Name);
+          Rest trest = (Rest)t;
           object instance = Activator.CreateInstance(tClass);
           instances.Add(tClass.Name, instance);
           MethodInfo[] methods = tClass.GetMethods();
@@ -41,12 +42,13 @@ namespace ASAttrib.Processors {
                   restCall.methodClass = tClass;
                   restCall.call = methodInfo;
                   restCall.method = (HTTPMethod)rta;
+                  restCall.baseRest = trest;
 
-                  LOG.i("     Registering method " + methodInfo.Name + " for " + restCall.method.Method + " " + restCall.method.Path);
+                  LOG.i("     Registering method " + methodInfo.Name + " for " + restCall.method.Method + " " + trest.Path  + restCall.method.Path);
 
                   addEndpoint(restCall);
                 } catch (DuplicateRestMethodException) {
-                  LOG.e("DuplicateRestMethodException: There is already a " + restCall.method.Method + " for " + restCall.method.Path + " registered.");
+                  LOG.e("DuplicateRestMethodException: There is already a " + restCall.method.Method + " for " + trest.Path  + restCall.method.Path + " registered.");
                 }
               }
             }
@@ -84,7 +86,7 @@ namespace ASAttrib.Processors {
     }
 
     private void addEndpoint(RestCall restCall) {
-      string path = restCall.method.Path;
+      string path = restCall.baseRest.Path + restCall.method.Path;
       if (!endpoints.ContainsKey(path)) {
         endpoints.Add(path, new Dictionary<string, RestCall>());
       }
