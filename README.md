@@ -1,4 +1,55 @@
-C# Application Server - a.k.a. SharpBoss
+C# Application Server - a.k.a. SharpBoss (**WIP**)
 ========================================
 
-A simple C# Application Server inspired on Redhat JBoss
+A simple C# Application Server inspired on Redhat JBoss Project.
+
+
+Features
+========
+
+So far we have:
+
+*	Working HTTP Server
+*	Hot-Deploy / Un-deploy Assemblies
+*	Log support
+*	Multiple Applications
+*	Exception Handling support with Debug Symbols Support (if provided on the app folder)
+*	JSON Serializer for Object Return in REST calls
+
+TODO
+======
+
+*	Argument Deserialization for REST calls 
+*	REST Path Param support
+*	Better threading for multiple apps
+*	**NHibernate Services** Support with Automatic Session Open / Close / Exception Handler
+*	Unit Tests to ensure everything is OK
+*   **Custom Exception Handlers**
+
+How it works
+=============
+
+If you have ever used Redhat JBoss, it is pretty similar but for .NET. So basically you create a `Library Project` that uses the **ASAttrib** REST attributes to make REST Endpoint calls. 
+
+The output `.dll` file should be put inside `apps/YOUR_APP_FOLDER` to be deployed. It can either be before executing the AppServer or after it (Hot-Deploy). The assemblies will be automatically copied to a folder called `deployed` to avoid filesystem locking issues. In this way, you can also update the `.dll` assembly anytime, and the AppServer will be automatically reload it. 
+
+The AppServer handles unhandled exceptions by logging and returning the `StackTrace` of the exception. If a `.pdb` file is available, it will also shows the source file and line number of the crash.
+
+Testing locally
+===============
+
+1. Compile the Solution
+2. Create a folder `apps` in the `AppServer.exe` folder.
+3. Create a folder `sampleapp` in `apps` folder
+4. Copy the `SampleApp.dll` and `SampleApp.pdb` file from the `SampleApp` project to `apps/sampleapp` folder.
+5. Run `AppServer.exe`
+
+You will have some endpoints available:
+
+*   `GET` **/test**
+    *   This will return a string `"GET TO HUEHUE"` as `text/plain`
+*   `POST` **/test**
+    *   This will return a JSON of `TestModel` with the fields `name` = `"Lucas"`, `count` = `10` and `test` = `"HUEHUE"`
+*   `GET` **/exception-test**
+    *   This will throw a test `NullReferenceException` with the message `Test of an Exception`
+
