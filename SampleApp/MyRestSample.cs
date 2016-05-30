@@ -1,5 +1,6 @@
 ﻿using ASAttrib.Attributes;
 using ASAttrib.Models;
+using System;
 using System.Net;
 
 namespace SampleApp {
@@ -18,6 +19,13 @@ namespace SampleApp {
       x.count = 10;
       x.test = "HUEHUE";
       return x;
+    }
+
+    [GET("/exception-test")]
+    public TestModel exceptionTest(RestRequest request) {
+      TestModel x;
+
+      throw new NullReferenceException("Test of an Exception");
     }
   }
 }

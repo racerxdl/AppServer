@@ -39,7 +39,16 @@ namespace AppServer.Server {
         LOG.d("Processing HTTP Call for App " + app + ": " + method + " " + path);
 
         if (appManager.containsEndPoint(app, path, method)) {
-          return appManager.callEndPoint(app, path, method, req);
+          try {
+            return appManager.callEndPoint(app, path, method, req);
+          } catch (Exception e) {
+            RestResult result = new RestResult();
+            LOG.e("Exception when calling application " + app + " in endpoint " + method + " " + path + "\r\n" + e.InnerException.ToString());
+            result.StatusCode = HttpStatusCode.InternalServerError;
+            result.ContentType = "text/plain";
+            result.Result = Encoding.UTF8.GetBytes(e.InnerException.ToString());
+            return result;
+          }
         } else {
           return new RestResult("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
         }

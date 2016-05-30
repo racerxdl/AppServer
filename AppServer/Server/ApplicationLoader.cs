@@ -162,10 +162,13 @@ namespace AppServer.Server {
 
       LoaderWorker lw = createLoaderWorker(domain);
 
-      List<string> assemblies = Directory.GetFiles(Path.Combine(".", "apps", appName)).ToList();
-      assemblies.ForEach(x => {
+      List<string> assemblies = Directory.GetFiles(Path.Combine(".", "apps", appName)).Where(x => x.Contains(".dll")).ToList();
+      assemblies.ForEach(appAssembly => {
         string targetPath = Path.Combine(".", "deployed", appName);
-        string targetFile = Path.Combine(targetPath, Path.GetFileName(x));
+        string targetFile = Path.Combine(targetPath, Path.GetFileName(appAssembly));
+        string appDebugAssembly = appAssembly.Replace(".dll", ".pdb");
+        string targetDebugFile = Path.Combine(targetPath, Path.GetFileName(appDebugAssembly));
+
         if (!Directory.Exists(targetPath)) {
           Directory.CreateDirectory(targetPath);
         }
@@ -174,8 +177,18 @@ namespace AppServer.Server {
           File.Delete(targetFile);
         }
 
-        LOG.i("Found " + x + ". Copying to " + targetFile);
-        File.Copy(x, targetFile);
+        if (File.Exists(targetDebugFile)) {
+          File.Delete(targetDebugFile);
+        }
+
+        LOG.i("Found " + appAssembly + ". Copying to " + targetFile);
+        File.Copy(appAssembly, targetFile);
+
+        if (File.Exists(appDebugAssembly)) {
+          LOG.i("Found debug file for " + appAssembly + " at " + appDebugAssembly);
+          File.Copy(appDebugAssembly, targetDebugFile);
+        }
+
         lw.loadAssembly(targetFile);
       });
 
