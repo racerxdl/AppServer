@@ -11,14 +11,18 @@ using System.Reflection;
 using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
+using System.Timers;
 
 namespace AppServer.Server {
   public class ApplicationManager {
 
     private static Logger LOG = new Logger(typeof(ApplicationManager));
 
+    private Timer appTimer;
     private Dictionary<string, AppDomain> appDomains;
     private Dictionary<string, LoaderWorker> loaderWorkers;
+
+    private Dictionary<string, AppAction> appActions;
 
     private FileSystemWatcher watcher;
 
@@ -26,8 +30,13 @@ namespace AppServer.Server {
       this.appDomains = new Dictionary<string, AppDomain>();
       this.loaderWorkers = new Dictionary<string, LoaderWorker>();
       this.watcher = new FileSystemWatcher();
+      this.appActions = new Dictionary<string, AppAction>();
 
       scanAndInitialize();
+
+      appTimer = new Timer();
+      appTimer.Interval = 5 * 1000;
+      appTimer.Elapsed += AppTimer_Elapsed;
 
       watcher.Path = Path.Combine(".", "apps");
       LOG.i("Attaching FileSystemWatcher to " + watcher.Path);
@@ -42,6 +51,34 @@ namespace AppServer.Server {
       watcher.Renamed += new RenamedEventHandler(onRenamed);
       watcher.IncludeSubdirectories = true;
       watcher.EnableRaisingEvents = true;
+    }
+
+    private void AppTimer_Elapsed(object sender, ElapsedEventArgs e) {
+      LOG.i("AppTimer Elapsed. Checking for application changes.");
+      List<AppAction> todo = new List<AppAction>();
+      lock (appActions) {
+        string[] keys = appActions.Keys.Select(x => x).ToArray();
+        foreach (string key in keys) {
+          todo.Add(appActions[key]);
+          appActions.Remove(key);
+        }
+      }
+      LOG.i(todo.Count + " appActions todo.");
+      // Do actions
+      lock (appDomains) {
+        lock (loaderWorkers) {
+          foreach (AppAction action in todo) {
+            if (action.ApplicationRemoved) {
+              unloadApplication(action.ApplicationName);
+              LOG.i("Application " + action.ApplicationName + " removed from pool.");
+            } else {
+              LOG.i("Application " + action.ApplicationName + " is available.");
+              loadApplication(action.ApplicationName);
+            }
+          }
+        }
+      }
+      appTimer.Enabled = false;
     }
 
     private AppDomain createDomain(string name, string folder) {
@@ -71,24 +108,53 @@ namespace AppServer.Server {
     }
     private void onCreated(object source, FileSystemEventArgs e) {
       LOG.i("onCreated Event: " + e.FullPath);
+      scheduleRefreshApplication(appNameFromFolder(e.FullPath), false);
     }
     private void onDeleted(object source, FileSystemEventArgs e) {
       LOG.i("onDeleted Event: " + e.FullPath);
+      scheduleRefreshApplication(appNameFromFolder(e.FullPath), true);
     }
     private void onChanged(object source, FileSystemEventArgs e) {
       LOG.i("onChanged Event: " + e.FullPath);
+      scheduleRefreshApplication(appNameFromFolder(e.FullPath), !(File.Exists(e.FullPath) || Directory.Exists(e.FullPath)));
     }
     private void onRenamed(object source, RenamedEventArgs e) {
       LOG.i("onRenamed Event: " + e.OldFullPath + " to " + e.FullPath);
+      scheduleRefreshApplication(appNameFromFolder(e.OldFullPath), true);
+      scheduleRefreshApplication(appNameFromFolder(e.FullPath), false);
     }
 
-    private void loadApplication(string appName) {
+    private void scheduleRefreshApplication(string application, bool removed) {
+      lock (appActions) {
+        if (appActions.ContainsKey(application)) {
+          appActions[application].ApplicationName = application;
+          appActions[application].ApplicationRemoved = removed;
+        } else {
+          appActions.Add(application, new AppAction(application, removed));
+        }
+      }
+      appTimer.Enabled = true;
+    }
+
+    private string appNameFromFolder(string folder) {
+      string appName = folder.Replace(".\\apps\\", "");
+      if (appName.IndexOf('\\') > -1) {
+        appName = appName.Substring(0, appName.IndexOf('\\'));
+      }
+      return appName;
+    }
+
+    private void unloadApplication(string appName) {
       if (appDomains.ContainsKey(appName)) {
         LOG.i("Unloading " + appName);
         loaderWorkers.Remove(appName);
         AppDomain.Unload(appDomains[appName]);
         appDomains.Remove(appName);
       }
+    }
+
+    private void loadApplication(string appName) {
+      unloadApplication(appName);
 
       LOG.i("Deploying " + appName);
       AppDomain domain = createDomain(appName, Environment.CurrentDirectory);
