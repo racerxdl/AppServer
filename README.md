@@ -15,6 +15,7 @@ So far we have:
 *	Multiple Applications
 *	Exception Handling support with Debug Symbols Support (if provided on the app folder)
 *	JSON Serializer for Object Return in REST calls
+*   **Custom Exception Handlers**
 
 TODO
 ======
@@ -24,7 +25,6 @@ TODO
 *	Better threading for multiple apps
 *	**NHibernate Services** Support with Automatic Session Open / Close / Exception Handler
 *	Unit Tests to ensure everything is OK
-*   **Custom Exception Handlers**
 
 How it works
 =============

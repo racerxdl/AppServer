@@ -1,10 +1,9 @@
 ﻿using ASAttrib.Attributes;
 using ASAttrib.Models;
 using System;
-using System.Net;
 
 namespace SampleApp {
-  [Rest("/hue")]
+  [REST("/hue")]
   public class MyRestSample {
 
     [GET("/test")]
@@ -23,9 +22,12 @@ namespace SampleApp {
 
     [GET("/exception-test")]
     public TestModel exceptionTest(RestRequest request) {
-      TestModel x;
-
       throw new NullReferenceException("Test of an Exception");
+    }
+
+    [GET("/custom-exception-test")]
+    public TestModel customExceptionTest(RestRequest request) {
+      throw new CustomException("NOOOOOOOOOOOOOOOOOOOOO!");
     }
   }
 }

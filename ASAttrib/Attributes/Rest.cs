@@ -2,9 +2,9 @@
 
 namespace ASAttrib.Attributes {
   [AttributeUsage(AttributeTargets.Class) ]
-  public class Rest : Attribute {
+  public class REST : Attribute {
     private string path;
-    public Rest(string path) {
+    public REST(string path) {
       this.path = path;
     }
 

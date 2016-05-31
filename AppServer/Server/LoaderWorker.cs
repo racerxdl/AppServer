@@ -1,4 +1,5 @@
-﻿using ASAttrib.Models;
+﻿using ASAttrib;
+using ASAttrib.Models;
 using ASAttrib.Processors;
 using ASTools.Logger;
 using System;
@@ -34,12 +35,21 @@ namespace AppServer.Server {
     public bool containsEndPoint(string path, string method) {
       return restProcessor.containsEndPoint(path, method);
     }
-    
+
     public RestResult callEndpoint(string path, string method, RestRequest request) {
-      return restProcessor.callEndPoint(path, method, request);
+      try {
+        return restProcessor.callEndPoint(path, method, request);
+      } catch (Exception e) {
+        string exceptionName = e.InnerException.GetType().Name;
+        IRestExceptionHandler handler = restProcessor.getExceptionHandler(exceptionName);
+        if (handler != null) {
+          return handler.handleException(e.InnerException);
+        }
+        throw e;
+      }
     }
 
-    private Assembly getAssembly(string assemblyPath) { 
+    private Assembly getAssembly(string assemblyPath) {
       string targetPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, assemblyPath);
       try {
         Assembly assembly;

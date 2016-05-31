@@ -69,7 +69,8 @@
     <Compile Include="Attributes\POST.cs" />
     <Compile Include="Attributes\GET.cs" />
     <Compile Include="Attributes\PUT.cs" />
-    <Compile Include="Attributes\Rest.cs" />
+    <Compile Include="Attributes\REST.cs" />
+    <Compile Include="Attributes\RestExceptionHandler.cs" />
     <Compile Include="Exceptions\DuplicateRestMethodException.cs" />
     <Compile Include="Models\RestCall.cs" />
     <Compile Include="Models\RestRequest.cs" />
@@ -77,6 +78,7 @@
     <Compile Include="Processors\RestProcessor.cs" />
     <Compile Include="Processors\Tools.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Interfaces\IRestExceptionHandler.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

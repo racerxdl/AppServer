@@ -12,6 +12,6 @@ namespace ASAttrib.Models {
     public Type methodClass;
     public MethodInfo call;
     public HTTPMethod method;
-    public Rest baseRest;
+    public REST baseRest;
   }
 }

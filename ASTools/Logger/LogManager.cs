@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Threading;
 
 namespace ASTools.Logger {
@@ -44,9 +40,7 @@ namespace ASTools.Logger {
     private FileStream waitForFile (string fullPath, FileMode mode) {
       for (int numTries = 0; numTries < 10; numTries++) {
         try {
-          FileStream fs = new FileStream (fullPath, mode);
-
-          return fs;
+          return new FileStream(fullPath, mode);
         } catch (IOException) {
           Thread.Sleep (50);
         }
@@ -62,9 +56,10 @@ namespace ASTools.Logger {
         DirectoryInfo logDirInfo = null;
         FileInfo logFileInfo;
 
-        string logFilePath = Path.Combine (this.logFolder, "Log-" + System.DateTime.Today.ToString ("MM-dd-yyyy") + "-" + AppDomain.CurrentDomain.FriendlyName + "." + "txt");
+        string logFilePath = Path.Combine (this.logFolder, "log-" + System.DateTime.Today.ToString ("MM-dd-yyyy") + "-" + AppDomain.CurrentDomain.FriendlyName + "." + "txt");
         logFileInfo = new FileInfo (logFilePath);
         logDirInfo = new DirectoryInfo (logFileInfo.DirectoryName);
+
         if (!logDirInfo.Exists)
           logDirInfo.Create ();
         if (!logFileInfo.Exists) {
@@ -72,6 +67,7 @@ namespace ASTools.Logger {
         } else {
           fileStream = waitForFile (logFilePath, FileMode.Append);
         }
+
         log = new StreamWriter (fileStream);
         log.WriteLine (TextTools.formatToLog (DateTime.Now.ToString (), className, level.ToString (), strLog));
         log.Close ();

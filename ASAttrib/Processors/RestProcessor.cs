@@ -16,20 +16,23 @@ namespace ASAttrib.Processors {
 
     private Dictionary<string, Dictionary<string, RestCall>> endpoints;
     private Dictionary<string, object> instances;
+    private Dictionary<string, IRestExceptionHandler> exceptionHandlers;
 
     public RestProcessor() {
       endpoints = new Dictionary<string, Dictionary<string, RestCall>>();
       instances = new Dictionary<string, object>();
+      exceptionHandlers = new Dictionary<string, IRestExceptionHandler>();
     }
 
     public void init(Assembly runningAssembly, string modulesAssembly) {
       Type[] typelist = Tools.GetTypesInNamespace(runningAssembly, modulesAssembly);
       for (int i = 0; i < typelist.Length; i++) {
         Type tClass = typelist[i];
-        Attribute t = tClass.GetCustomAttribute(typeof(Rest));
+        // Search for REST Attribute
+        Attribute t = tClass.GetCustomAttribute(typeof(REST));
         if (t != null) {
           LOG.i("Found REST class " + tClass.Name);
-          Rest trest = (Rest)t;
+          REST trest = (REST)t;
           object instance = Activator.CreateInstance(tClass);
           instances.Add(tClass.Name, instance);
           MethodInfo[] methods = tClass.GetMethods();
@@ -54,10 +57,28 @@ namespace ASAttrib.Processors {
             }
           }
         }
+        // Search for RestExceptionHandler Attribute
+        t = tClass.GetCustomAttribute(typeof(RestExceptionHandler));
+        if ( t != null ) {
+          LOG.i("Found a RestExceptionHandler " + tClass.Name);
+          if (typeof(IRestExceptionHandler).IsAssignableFrom(tClass)) {
+            RestExceptionHandler reh = (RestExceptionHandler)t;
+            if (typeof(Exception).IsAssignableFrom(reh.exceptionType)) {
+              IRestExceptionHandler handler = (IRestExceptionHandler)Activator.CreateInstance(tClass);
+              exceptionHandlers.Add(reh.ExceptionType.Name, handler);
+              LOG.i("     Registered a custom exception handler for exception \"" + reh.ExceptionType.Name + "\" for class " + tClass.Name);
+            } else {
+              LOG.e("     Class " + tClass.Name + " contains the \"RestExceptionHandler\" attribute the passed type does not inherit Exception class. Skipping it.");
+            }
+          } else {
+            LOG.e("     Class " + tClass.Name + " contains the \"RestExceptionHandler\" attribute but does not implement IRestExceptionHandler. Skipping it.");
+          }
+        }
       }
 
       LOG.i("Initialized " + instances.Count + " REST instances.");
       LOG.i("Initialized " + endpoints.Keys.Count + " REST endpoints.");
+      LOG.i("Initialized " + exceptionHandlers.Keys.Count + " Custom Exception Handlers");
     }
 
     public RestCall getEndPoint(string path, string method) {
@@ -66,6 +87,14 @@ namespace ASAttrib.Processors {
       }
 
       return null;
+    }
+
+    public IRestExceptionHandler getExceptionHandler(string exceptionName) {
+      if (exceptionHandlers.ContainsKey(exceptionName)) {
+        return exceptionHandlers[exceptionName];
+      } else {
+        return null;
+      }
     }
 
     public RestResult callEndPoint(string path, string method, RestRequest request) {
