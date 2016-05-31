@@ -42,12 +42,36 @@ namespace AppServer.Server {
     private Assembly getAssembly(string assemblyPath) { 
       string targetPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, assemblyPath);
       try {
+        Assembly assembly;
         LOG.d("Trying to load file " + targetPath);
-        Assembly a = Assembly.LoadFile(targetPath);
-        LOG.i("Loaded " + a.FullName);
-        return a;
+
+        byte[] rawAssembly = loadFile(targetPath);
+        byte[] rawSymbolStore = loadFile(targetPath.Replace(".dll", ".pdb"));
+
+        if (rawSymbolStore != null) {
+          assembly = AppDomain.CurrentDomain.Load(rawAssembly, rawSymbolStore);
+        } else {
+          assembly = AppDomain.CurrentDomain.Load(rawAssembly);
+        }
+
+        LOG.i("Loaded " + assembly.FullName);
+        return assembly;
       } catch (Exception e) {
         LOG.e("Error loading " + assemblyPath + ": " + e.Message);
+        return null;
+      }
+    }
+
+    private static byte[] loadFile(string filename) {
+      try {
+        FileStream fs = new FileStream(filename, FileMode.Open);
+        byte[] buffer = new byte[(int)fs.Length];
+        fs.Read(buffer, 0, buffer.Length);
+        fs.Close();
+
+        return buffer;
+      } catch (IOException) {
+        LOG.w("Cannot find file: " + filename);
         return null;
       }
     }

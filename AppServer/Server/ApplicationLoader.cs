@@ -102,13 +102,19 @@ namespace AppServer.Server {
       }
     }
     private void onCreated(object source, FileSystemEventArgs e) {
-      scheduleRefreshApplication(appNameFromFolder(e.FullPath), false);
+      if (!e.FullPath.Equals(Path.Combine(".", "apps"))) {
+        scheduleRefreshApplication(appNameFromFolder(e.FullPath), false);
+      }
     }
     private void onDeleted(object source, FileSystemEventArgs e) {
-      scheduleRefreshApplication(appNameFromFolder(e.FullPath), true);
+      if (!e.FullPath.Equals(Path.Combine(".", "apps"))) {
+        scheduleRefreshApplication(appNameFromFolder(e.FullPath), true);
+      }
     }
     private void onChanged(object source, FileSystemEventArgs e) {
-      scheduleRefreshApplication(appNameFromFolder(e.FullPath), !(File.Exists(e.FullPath) || Directory.Exists(e.FullPath)));
+      if (!e.FullPath.Equals(Path.Combine(".", "apps"))) {
+        scheduleRefreshApplication(appNameFromFolder(e.FullPath), !(File.Exists(e.FullPath) || Directory.Exists(e.FullPath)));
+      }
     }
     private void onRenamed(object source, RenamedEventArgs e) {
       scheduleRefreshApplication(appNameFromFolder(e.OldFullPath), true);
@@ -130,16 +136,24 @@ namespace AppServer.Server {
     }
 
     private string appNameFromFolder(string folder) {
-      folder = Path.GetDirectoryName(folder);
+      if (File.Exists(folder)) { // A folder changed
+        folder = Path.GetDirectoryName(folder);
+      }
       return folder.Substring(folder.LastIndexOf("apps" + ASTools.Tools.DIRECTORY_SEPARATOR)).Split(ASTools.Tools.DIRECTORY_SEPARATOR)[1];
     }
 
     private void unloadApplication(string appName) {
       if (appDomains.ContainsKey(appName)) {
         LOG.i("Unloading " + appName);
-        loaderWorkers.Remove(appName);
-        AppDomain.Unload(appDomains[appName]);
-        appDomains.Remove(appName);
+        try {
+          loaderWorkers.Remove(appName);
+          AppDomain.Unload(appDomains[appName]);
+          appDomains.Remove(appName);
+          var dir = new DirectoryInfo(Path.Combine(".", "deployed", appName));
+          dir.Delete(true);
+        } catch (Exception e) {
+          LOG.e("Failed unloading " + appName + ": \n" + e.ToString());
+        }
       }
     }
 
@@ -158,28 +172,31 @@ namespace AppServer.Server {
         string targetFile = Path.Combine(targetPath, Path.GetFileName(appAssembly));
         string appDebugAssembly = appAssembly.Replace(".dll", ".pdb");
         string targetDebugFile = Path.Combine(targetPath, Path.GetFileName(appDebugAssembly));
+        try {
+          if (!Directory.Exists(targetPath)) {
+            Directory.CreateDirectory(targetPath);
+          }
 
-        if (!Directory.Exists(targetPath)) {
-          Directory.CreateDirectory(targetPath);
+          if (File.Exists(targetFile)) {
+            File.Delete(targetFile);
+          }
+
+          if (File.Exists(targetDebugFile)) {
+            File.Delete(targetDebugFile);
+          }
+
+          LOG.i("Found " + appAssembly + ". Copying to " + targetFile);
+          File.Copy(appAssembly, targetFile);
+
+          if (File.Exists(appDebugAssembly)) {
+            LOG.i("Found debug file for " + appAssembly + " at " + appDebugAssembly);
+            File.Copy(appDebugAssembly, targetDebugFile);
+          }
+
+          lw.loadAssembly(targetFile);
+        } catch (Exception e) {
+          LOG.e("Failed loading application assembly " + appAssembly + ": \n" + e.ToString());
         }
-
-        if (File.Exists(targetFile)) {
-          File.Delete(targetFile);
-        }
-
-        if (File.Exists(targetDebugFile)) {
-          File.Delete(targetDebugFile);
-        }
-
-        LOG.i("Found " + appAssembly + ". Copying to " + targetFile);
-        File.Copy(appAssembly, targetFile);
-
-        if (File.Exists(appDebugAssembly)) {
-          LOG.i("Found debug file for " + appAssembly + " at " + appDebugAssembly);
-          File.Copy(appDebugAssembly, targetDebugFile);
-        }
-
-        lw.loadAssembly(targetFile);
       });
 
       loaderWorkers.Add(appName, lw);
