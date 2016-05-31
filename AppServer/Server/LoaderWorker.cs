@@ -17,7 +17,7 @@ namespace AppServer.Server {
     private RestProcessor restProcessor;
 
     public LoaderWorker() {
-      LogManager.initialize(".\\", LogLevel.DEBUG);
+      LogManager.initialize(".", LogLevel.DEBUG);
       LOG.i(String.Format("LoaderWorker created in AppDomain \"{0}\"", AppDomain.CurrentDomain.FriendlyName));
       restProcessor = new RestProcessor();
     }

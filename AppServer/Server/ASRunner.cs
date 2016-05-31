@@ -19,7 +19,9 @@ namespace AppServer.Server {
     public ASRunner() {
       server = new HttpServer("http://localhost:8080/", processHttpCalls);
       appManager = new ApplicationManager();
-      Console.WindowWidth = 180;
+      if (ASTools.Tools.getRunningPlatform() == ASTools.Platform.Windows) {
+        Console.WindowWidth = 180;
+      }
     }
 
     public void run() {
@@ -39,7 +41,7 @@ namespace AppServer.Server {
         LOG.d("Processing HTTP Call for App " + app + ": " + method + " " + path);
 
         if (appManager.containsEndPoint(app, path, method)) {
-          try {
+          try { 
             return appManager.callEndPoint(app, path, method, req);
           } catch (Exception e) {
             RestResult result = new RestResult();

@@ -72,6 +72,7 @@ namespace AppServer.Server {
           }
         }
       }
+      appTimer.AutoReset = false;
       appTimer.Enabled = false;
     }
 
@@ -101,24 +102,21 @@ namespace AppServer.Server {
       }
     }
     private void onCreated(object source, FileSystemEventArgs e) {
-      LOG.i("onCreated Event: " + e.FullPath);
       scheduleRefreshApplication(appNameFromFolder(e.FullPath), false);
     }
     private void onDeleted(object source, FileSystemEventArgs e) {
-      LOG.i("onDeleted Event: " + e.FullPath);
       scheduleRefreshApplication(appNameFromFolder(e.FullPath), true);
     }
     private void onChanged(object source, FileSystemEventArgs e) {
-      LOG.i("onChanged Event: " + e.FullPath);
       scheduleRefreshApplication(appNameFromFolder(e.FullPath), !(File.Exists(e.FullPath) || Directory.Exists(e.FullPath)));
     }
     private void onRenamed(object source, RenamedEventArgs e) {
-      LOG.i("onRenamed Event: " + e.OldFullPath + " to " + e.FullPath);
       scheduleRefreshApplication(appNameFromFolder(e.OldFullPath), true);
       scheduleRefreshApplication(appNameFromFolder(e.FullPath), false);
     }
 
     private void scheduleRefreshApplication(string application, bool removed) {
+      LOG.i ("Detected change for " + application);
       lock (appActions) {
         if (appActions.ContainsKey(application)) {
           appActions[application].ApplicationName = application;
@@ -128,14 +126,12 @@ namespace AppServer.Server {
         }
       }
       appTimer.Enabled = true;
+      appTimer.Start();
     }
 
     private string appNameFromFolder(string folder) {
-      string appName = folder.Replace(".\\apps\\", "");
-      if (appName.IndexOf('\\') > -1) {
-        appName = appName.Substring(0, appName.IndexOf('\\'));
-      }
-      return appName;
+      folder = Path.GetDirectoryName(folder);
+      return folder.Substring(folder.LastIndexOf("apps" + ASTools.Tools.DIRECTORY_SEPARATOR)).Split(ASTools.Tools.DIRECTORY_SEPARATOR)[1];
     }
 
     private void unloadApplication(string appName) {

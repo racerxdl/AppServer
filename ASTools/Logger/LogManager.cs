@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace ASTools.Logger {
   public enum LogLevel {
@@ -24,8 +25,8 @@ namespace ASTools.Logger {
 
     private static LogManager instance;
 
-    public static void initialize(string logFolder, LogLevel logLevel) {
-      LogManager.instance = new LogManager(logFolder, logLevel);
+    public static void initialize (string logFolder, LogLevel logLevel) {
+      LogManager.instance = new LogManager (logFolder, logLevel);
     }
 
     public static LogManager Instance {
@@ -34,35 +35,50 @@ namespace ASTools.Logger {
 
     private string logFolder;
     private LogLevel logLevel;
-    private LogManager(string logFolder, LogLevel logLevel) {
+
+    private LogManager (string logFolder, LogLevel logLevel) {
       this.logFolder = logFolder;
       this.logLevel = logLevel;
     }
 
-    public async void WriteLog(string className, LogLevel level, string strLog) {
+    private FileStream waitForFile (string fullPath, FileMode mode) {
+      for (int numTries = 0; numTries < 10; numTries++) {
+        try {
+          FileStream fs = new FileStream (fullPath, mode);
+
+          return fs;
+        } catch (IOException) {
+          Thread.Sleep (50);
+        }
+      }
+
+      return null;
+    }
+
+    public async void WriteLog (string className, LogLevel level, string strLog) {
       if (level <= this.logLevel) {
         StreamWriter log;
         FileStream fileStream = null;
         DirectoryInfo logDirInfo = null;
         FileInfo logFileInfo;
 
-        string logFilePath = this.logFolder + "Log-" + System.DateTime.Today.ToString("MM-dd-yyyy") + "-" + AppDomain.CurrentDomain.FriendlyName + "." + "txt";
-        logFileInfo = new FileInfo(logFilePath);
-        logDirInfo = new DirectoryInfo(logFileInfo.DirectoryName);
+        string logFilePath = Path.Combine (this.logFolder, "Log-" + System.DateTime.Today.ToString ("MM-dd-yyyy") + "-" + AppDomain.CurrentDomain.FriendlyName + "." + "txt");
+        logFileInfo = new FileInfo (logFilePath);
+        logDirInfo = new DirectoryInfo (logFileInfo.DirectoryName);
         if (!logDirInfo.Exists)
-          logDirInfo.Create();
+          logDirInfo.Create ();
         if (!logFileInfo.Exists) {
-          fileStream = logFileInfo.Create();
+          fileStream = logFileInfo.Create ();
         } else {
-          fileStream = new FileStream(logFilePath, FileMode.Append);
+          fileStream = waitForFile (logFilePath, FileMode.Append);
         }
-        log = new StreamWriter(fileStream);
-        log.WriteLine(TextTools.formatToLog(DateTime.Now.ToString(), className, level.ToString(), strLog));
-        log.Close();
+        log = new StreamWriter (fileStream);
+        log.WriteLine (TextTools.formatToLog (DateTime.Now.ToString (), className, level.ToString (), strLog));
+        log.Close ();
 
-        Console.ForegroundColor = logColors[(int)level];
-        Console.WriteLine(TextTools.formatToLog(DateTime.Now.ToString(), className, level.ToString(), strLog));
-        Console.ResetColor();
+        Console.ForegroundColor = logColors [(int)level];
+        Console.WriteLine (TextTools.formatToLog (DateTime.Now.ToString (), className, level.ToString (), strLog));
+        Console.ResetColor ();
       }
     }
   }
