@@ -29,7 +29,7 @@ namespace AppServer.Server {
       Console.ReadLine();
     }
     RestResult processHttpCalls(HttpListenerRequest request) {
-      string[] ePath = request.RawUrl.Split(new char[] { '/' }, 2, StringSplitOptions.RemoveEmptyEntries);
+      string[] ePath = request.Url.AbsolutePath.Split(new char[] { '/' }, 2, StringSplitOptions.RemoveEmptyEntries);
       RestRequest req = new RestRequest(request);
       if (ePath.Length == 0) {
         return new RestResult("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
@@ -37,6 +37,7 @@ namespace AppServer.Server {
         string path = ePath.Length > 1 ? "/" + ePath[1] : "/";
         string method = request.HttpMethod;
         string app = ePath[0];
+        
 
         LOG.d("Processing HTTP Call for App " + app + ": " + method + " " + path);
 

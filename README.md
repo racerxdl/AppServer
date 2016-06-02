@@ -9,22 +9,22 @@ Features
 
 So far we have:
 
-*	Working HTTP Server
-*	Hot-Deploy / Un-deploy Assemblies
-*	Log support
-*	Multiple Applications
-*	Exception Handling support with Debug Symbols Support (if provided on the app folder)
-*	JSON Serializer for Object Return in REST calls
+*   Working HTTP Server
+*   Hot-Deploy / Un-deploy Assemblies
+*   Log support
+*   Multiple Applications
+*   Exception Handling support with Debug Symbols Support (if provided on the app folder)
+*   JSON Serializer for Object Return in REST calls
 *   **Custom Exception Handlers**
+*   Argument Deserialization for REST calls 
 
 TODO
 ======
 
-*	Argument Deserialization for REST calls 
-*	REST Path Param support
-*	Better threading for multiple apps
-*	**NHibernate Services** Support with Automatic Session Open / Close / Exception Handler
-*	Unit Tests to ensure everything is OK
+*   REST Path Param support (**WIP**)
+*   Better threading for multiple apps
+*   **NHibernate Services** Support with Automatic Session Open / Close / Exception Handler
+*   Unit Tests to ensure everything is OK
 
 How it works
 =============
@@ -44,30 +44,56 @@ The SampleApp Example:
 
 ```cs
 namespace SampleApp {
-    [Rest("/hue")]
-    public class MyRestSample {
-        [GET("/test")]
-        public string hueTest(RestRequest request) {
-          return "GET TO HUEHUE";
-        }
-        
-        [POST("/test")]
-        public TestModel hueTest2(RestRequest request) {
-          TestModel x = new TestModel();
-          x.name = "Lucas";
-          x.count = 10;
-          x.test = "HUEHUE";
-          return x;
-        }
-        [GET("/exception-test")]
-        public TestModel exceptionTest(RestRequest request) {
-          throw new NullReferenceException("Test of an Exception");
-        }
+  [Rest("/hue")]
+  public class MyRestSample {
+    [GET("/test")]
+    public string hueTest([QueryParam] string param0, [QueryParam] float param1) {
+      return "GET TO HUEHUE with param: Param0(" + param0 + "), Param1(" + param1 +")";
     }
+    
+    [POST("/test")]
+    public TestModel hueTest2(TestModel model) {
+      model.count += 100;
+      return model;
+    }
+
+    [GET("/exception-test")]
+    public TestModel exceptionTest() {
+      throw new NullReferenceException("Test of an Exception");
+    }
+
+    [GET("/custom-exception-test")]
+    public TestModel customExceptionTest() {
+      throw new CustomException("NOOOOOOOOOOOOOOOOOOOOO!");
+    }
+  }
 }
 ```
-
 This will create the endpoints that will be described in the next section.
+
+
+How to use Custom Exception Handler
+===================================
+
+Also it is very simple. Just create a class that implements the interface `IRestExceptionHandler` and put a attribute `[RestExceptionHandler(typeof(TheExceptionYouWantToHandle))]` on it and you're good to go. Example:
+
+```cs
+namespace SampleApp {
+  [RestExceptionHandler(typeof(CustomException))]
+  public class MyCustomExceptionHandler : IRestExceptionHandler {
+    public RestResult handleException(Exception e) {
+      CustomException ce = (CustomException)e;    //  The Custom Exception handler will only be called with the correct type of exception
+
+      RestResult result = new RestResult();
+      result.ContentType = "text/plain";
+      result.StatusCode = System.Net.HttpStatusCode.NotAcceptable;
+      result.Result = Encoding.UTF8.GetBytes("Handling CustomException that has a message: " + ce.Message);
+
+      return result;
+    }
+  }
+}
+```
 
 Testing locally
 ===============
@@ -80,9 +106,26 @@ Testing locally
 
 You will have some endpoints available:
 
-*   `GET` **/sampleapp/hue/test**
-    *   This will return a string `"GET TO HUEHUE"` as `text/plain`
+*   `GET` **/sampleapp/hue/test?param0=SomeString&param1=30,5**
+    *   This will return a string `"GET TO HUEHUE with param: Param0(SomeString), Param1(30,5)"` as `text/plain`
 *   `POST` **/sampleapp/hue/test**
-    *   This will return a JSON of `TestModel` with the fields `name` = `"Lucas"`, `count` = `10` and `test` = `"HUEHUE"`
+    * Post with a JSON like this: 
+    ```json
+      {
+        "name":"Lucas",
+        "count":10,
+        "test":"HUEHUE"
+      }
+    ```
+    * The response will be this:
+    ```json
+    {
+      "name":"Lucas",
+      "count":110,
+      "test":"HUEHUE"
+    }
+    ```
 *   `GET` **/sampleapp/hue/exception-test**
     *   This will throw a test `NullReferenceException` with the message `Test of an Exception`
+*   `GET` **/sampleapp/hue/custom-exception-test**
+    *   This will throw a test `CustomException` that will be handled by MyCustomExceptionHandler and will output `Handling CustomException that has a message: NOOOOOOOOOOOOOOOOOOOOO!`

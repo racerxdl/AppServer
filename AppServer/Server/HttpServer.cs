@@ -36,18 +36,6 @@ namespace AppServer.Server {
               var ctx = c as HttpListenerContext;
               try {
                 LOG.d(ctx.Request.HttpMethod + " - " + ctx.Request.RawUrl);
-                String requestBody = "";
-                JObject jbody = null;
-                if (ctx.Request.HasEntityBody) {
-                  using (System.IO.Stream body = ctx.Request.InputStream) {
-                    using (System.IO.StreamReader reader = new System.IO.StreamReader(body, ctx.Request.ContentEncoding)) {
-                      requestBody = reader.ReadToEnd();
-                    }
-                  }
-                  if (ctx.Request.ContentType.Equals("application/json")) {
-                    jbody = JObject.Parse(requestBody);
-                  }
-                }
                 RestResult ret = httpProcesser(ctx.Request);
                 ctx.Response.ContentType = ret.ContentType;
                 ctx.Response.StatusCode = (int)ret.StatusCode;

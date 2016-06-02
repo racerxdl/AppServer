@@ -66,9 +66,11 @@
   <ItemGroup>
     <Compile Include="Attributes\DELETE.cs" />
     <Compile Include="Attributes\HTTPMethod.cs" />
+    <Compile Include="Attributes\PathParam.cs" />
     <Compile Include="Attributes\POST.cs" />
     <Compile Include="Attributes\GET.cs" />
     <Compile Include="Attributes\PUT.cs" />
+    <Compile Include="Attributes\QueryParam.cs" />
     <Compile Include="Attributes\REST.cs" />
     <Compile Include="Attributes\RestExceptionHandler.cs" />
     <Compile Include="Exceptions\DuplicateRestMethodException.cs" />

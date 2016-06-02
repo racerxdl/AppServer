@@ -27,6 +27,7 @@ namespace ASAttrib.Models {
     private string userHostAddress;
     private string userHostName;
     private string[] userLanguages;
+    private string bodyData;
     private Uri url;
     private Uri urlReferrer;
 
@@ -180,6 +181,8 @@ namespace ASAttrib.Models {
     //     header, or null if the header was not included in the request.
     public Uri UrlReferrer { get { return urlReferrer; } }
 
+    public string BodyData { get { return bodyData; } }
+
     public RestRequest(HttpListenerRequest request) {
       this.userAgent = request.UserAgent;
       this.userHostAddress = request.UserHostAddress;
@@ -200,6 +203,13 @@ namespace ASAttrib.Models {
       this.keepAlive = request.KeepAlive;
       this.queryString = request.QueryString;
       this.rawUrl = request.RawUrl;
+      if (request.HasEntityBody) {
+        using (System.IO.Stream body = request.InputStream) {
+          using (System.IO.StreamReader reader = new System.IO.StreamReader(body, request.ContentEncoding)) {
+            bodyData = reader.ReadToEnd();
+          }
+        }
+      }
     }
   }
 }

@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
+using System.Linq;
 
 namespace ASAttrib.Processors {
   public class RestProcessor {
@@ -28,6 +29,7 @@ namespace ASAttrib.Processors {
       Type[] typelist = Tools.GetTypesInNamespace(runningAssembly, modulesAssembly);
       for (int i = 0; i < typelist.Length; i++) {
         Type tClass = typelist[i];
+
         // Search for REST Attribute
         Attribute t = tClass.GetCustomAttribute(typeof(REST));
         if (t != null) {
@@ -57,6 +59,7 @@ namespace ASAttrib.Processors {
             }
           }
         }
+
         // Search for RestExceptionHandler Attribute
         t = tClass.GetCustomAttribute(typeof(RestExceptionHandler));
         if ( t != null ) {
@@ -100,12 +103,82 @@ namespace ASAttrib.Processors {
     public RestResult callEndPoint(string path, string method, RestRequest request) {
       RestCall rc = getEndPoint(path, method);
       if (instances.ContainsKey(rc.methodClass.Name)) {
-        object ret = rc.call.Invoke(instances[rc.methodClass.Name], new object[] { request });
+        /**
+         * Parameters Processing
+         * 
+         * For now we're using Reflection to fill the parameters,
+         * but in the future I think it is best to create a proxy class
+         * to the target class, that receives RestRequest and calls the 
+         * subsequent class with the correct parameters. Then we only 
+         * do reflection at the setup
+         */
+        ParameterInfo[] parameters = rc.call.GetParameters();
+        object[] methodParams = new object[parameters.Length];
+        int i = 0;
+        foreach (ParameterInfo param in parameters) {
+          // Try query param
+          Attribute pa = param.GetCustomAttribute(typeof(QueryParam));
+          if (pa != null) {
+            QueryParam q = (QueryParam)pa;
+            string queryName = q.ParamName == null ? param.Name : q.ParamName;
+            string queryData = request.QueryString[queryName];
+
+            // If anyone knows a better way to do this. Please say it.
+            // This is ugly
+            if (!typeof(string).IsAssignableFrom(param.ParameterType)) {
+              // Not String Parameter
+              if (typeof(long).IsAssignableFrom(param.ParameterType)) {
+                long output = 0;
+                long.TryParse(queryData, out output);
+                methodParams[i] = output;
+              } else if (typeof(int).IsAssignableFrom(param.ParameterType)) {
+                int output = 0;
+                int.TryParse(queryData, out output);
+                methodParams[i] = output;
+              } else if (typeof(double).IsAssignableFrom(param.ParameterType)) {
+                double output = 0;
+                double.TryParse(queryData, out output);
+                methodParams[i] = output;
+              } else if (typeof(float).IsAssignableFrom(param.ParameterType)) {
+                float output = 0;
+                float.TryParse(queryData, out output);
+                methodParams[i] = output;
+              }
+            } else {
+              methodParams[i] = queryData;
+            }
+
+            i++;
+            continue;
+          }
+
+          // Try Path param
+          pa = param.GetCustomAttribute(typeof(PathParam));
+          if (pa != null) {
+            // TODO: Path Param
+            i++;
+            continue;
+          }
+
+          // If no match to our Attributes, then it is a body data. Try to deserialize
+          if (request.BodyData != null) {
+            if (typeof(string).IsAssignableFrom(param.ParameterType)) {
+              methodParams[i] = request.BodyData;
+            } else {
+              methodParams[i] = JsonConvert.DeserializeObject(request.BodyData, param.ParameterType);
+            }
+          }
+          i++;
+        }
+
+        // Calling the target method
+        object ret = rc.call.Invoke(instances[rc.methodClass.Name], methodParams);
         if (ret is string) {
           return new RestResult((string)ret);
         } else {
           return new RestResult(JsonConvert.SerializeObject(ret), "application/json");
         }
+
       }
       return new RestResult("Not found", "text/plain", HttpStatusCode.NotFound);
     }

@@ -7,26 +7,23 @@ namespace SampleApp {
   public class MyRestSample {
 
     [GET("/test")]
-    public string hueTest(RestRequest request) {
-      return "GET TO HUEHUE";
+    public string hueTest([QueryParam] string param0, [QueryParam] float param1) {
+      return "GET TO HUEHUE with param: Param0(" + param0 + "), Param1(" + param1 +")";
     }
 
     [POST("/test")]
-    public TestModel hueTest2(RestRequest request) {
-      TestModel x = new TestModel();
-      x.name = "Lucas";
-      x.count = 10;
-      x.test = "HUEHUE";
-      return x;
+    public TestModel hueTest2(TestModel model) {
+      model.count += 100;
+      return model;
     }
 
     [GET("/exception-test")]
-    public TestModel exceptionTest(RestRequest request) {
+    public TestModel exceptionTest() {
       throw new NullReferenceException("Test of an Exception");
     }
 
     [GET("/custom-exception-test")]
-    public TestModel customExceptionTest(RestRequest request) {
+    public TestModel customExceptionTest() {
       throw new CustomException("NOOOOOOOOOOOOOOOOOOOOO!");
     }
   }
