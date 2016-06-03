@@ -10,6 +10,7 @@ namespace ASTools {
 
   public class Tools {
     public static readonly char DIRECTORY_SEPARATOR = getRunningPlatform() == Platform.Windows ? '\\' : '/';
+    public static readonly string DEBUG_SYMBOLS_EXTENSION = getRunningPlatform() == Platform.Windows ? ".pdb" : ".dll.mdb";
 
     public static Platform getRunningPlatform() {
       switch (Environment.OSVersion.Platform) {

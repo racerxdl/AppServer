@@ -166,11 +166,11 @@ namespace AppServer.Server {
 
       LoaderWorker lw = createLoaderWorker(domain);
 
-      List<string> assemblies = Directory.GetFiles(Path.Combine(".", "apps", appName)).Where(x => x.Contains(".dll")).ToList();
+      List<string> assemblies = Directory.GetFiles(Path.Combine(".", "apps", appName)).Where(x => x.EndsWith(".dll")).ToList();
       assemblies.ForEach(appAssembly => {
         string targetPath = Path.Combine(".", "deployed", appName);
         string targetFile = Path.Combine(targetPath, Path.GetFileName(appAssembly));
-        string appDebugAssembly = appAssembly.Replace(".dll", ".pdb");
+        string appDebugAssembly = appAssembly.Replace(".dll", ASTools.Tools.DEBUG_SYMBOLS_EXTENSION);
         string targetDebugFile = Path.Combine(targetPath, Path.GetFileName(appDebugAssembly));
         try {
           if (!Directory.Exists(targetPath)) {
