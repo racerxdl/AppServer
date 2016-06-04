@@ -8,7 +8,7 @@ using System.Security.Policy;
 using System.Timers;
 
 namespace AppServer.Server {
-  public class ApplicationManager {
+  internal class ApplicationManager {
 
     private static Logger LOG = new Logger(typeof(ApplicationManager));
 
@@ -19,12 +19,16 @@ namespace AppServer.Server {
     private Dictionary<string, AppAction> appActions;
 
     private FileSystemWatcher watcher;
+    private string appsDir;
+    private string deployedDir;
 
     public ApplicationManager() {
       this.appDomains = new Dictionary<string, AppDomain>();
       this.loaderWorkers = new Dictionary<string, LoaderWorker>();
       this.watcher = new FileSystemWatcher();
       this.appActions = new Dictionary<string, AppAction>();
+      this.appsDir = Path.Combine(".", "apps");
+      this.deployedDir = Path.Combine(".", "deployed");
 
       scanAndInitialize();
 
@@ -96,23 +100,26 @@ namespace AppServer.Server {
       return (LoaderWorker)domain.CreateInstanceAndUnwrap(lwt.Assembly.FullName, lwt.FullName);
     }
     private void scanAndInitialize() {
-      List<string> apps = Directory.GetDirectories(Path.Combine(".", "apps")).Select(a => Path.GetFileName(a)).ToList();
+      if (!Directory.Exists(appsDir)) {
+        Directory.CreateDirectory(appsDir);
+      }
+      List<string> apps = Directory.GetDirectories(appsDir).Select(a => Path.GetFileName(a)).ToList();
       foreach (string app in apps) {
         loadApplication(app);
       }
     }
     private void onCreated(object source, FileSystemEventArgs e) {
-      if (!e.FullPath.Equals(Path.Combine(".", "apps"))) {
+      if (!e.FullPath.Equals(appsDir)) {
         scheduleRefreshApplication(appNameFromFolder(e.FullPath), false);
       }
     }
     private void onDeleted(object source, FileSystemEventArgs e) {
-      if (!e.FullPath.Equals(Path.Combine(".", "apps"))) {
+      if (!e.FullPath.Equals(appsDir)) {
         scheduleRefreshApplication(appNameFromFolder(e.FullPath), true);
       }
     }
     private void onChanged(object source, FileSystemEventArgs e) {
-      if (!e.FullPath.Equals(Path.Combine(".", "apps"))) {
+      if (!e.FullPath.Equals(appsDir)) {
         scheduleRefreshApplication(appNameFromFolder(e.FullPath), !(File.Exists(e.FullPath) || Directory.Exists(e.FullPath)));
       }
     }
@@ -166,9 +173,9 @@ namespace AppServer.Server {
 
       LoaderWorker lw = createLoaderWorker(domain);
 
-      List<string> assemblies = Directory.GetFiles(Path.Combine(".", "apps", appName)).Where(x => x.Contains(".dll")).ToList();
+      List<string> assemblies = Directory.GetFiles(Path.Combine(appsDir, appName)).Where(x => x.Contains(".dll")).ToList();
       assemblies.ForEach(appAssembly => {
-        string targetPath = Path.Combine(".", "deployed", appName);
+        string targetPath = Path.Combine(deployedDir, appName);
         string targetFile = Path.Combine(targetPath, Path.GetFileName(appAssembly));
         string appDebugAssembly = appAssembly.Replace(".dll", ".pdb");
         string targetDebugFile = Path.Combine(targetPath, Path.GetFileName(appDebugAssembly));

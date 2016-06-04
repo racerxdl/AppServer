@@ -1,5 +1,5 @@
 ﻿namespace AppServer.Server {
-  class AppAction {
+  internal class AppAction {
     private string appName;
     private bool remove;
 

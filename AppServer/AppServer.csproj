@@ -68,7 +68,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Models\TestModel.cs" />
     <Compile Include="Server\AppAction.cs" />
     <Compile Include="Server\ApplicationLoader.cs" />
     <Compile Include="Server\ASRunner.cs" />

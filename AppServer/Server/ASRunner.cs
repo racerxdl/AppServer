@@ -1,16 +1,11 @@
 ﻿using ASAttrib.Models;
-using ASAttrib.Processors;
 using ASTools.Logger;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace AppServer.Server {
-  class ASRunner {
+  internal class ASRunner {
     
     HttpServer server;
     ApplicationManager appManager;
@@ -46,10 +41,17 @@ namespace AppServer.Server {
             return appManager.callEndPoint(app, path, method, req);
           } catch (Exception e) {
             RestResult result = new RestResult();
-            LOG.e("Exception when calling application " + app + " in endpoint " + method + " " + path + "\r\n" + e.InnerException.ToString());
+            string exceptionMessage;
+            if (e.InnerException != null) { // In the rest exceptions the real exception will be at InnerException.
+              LOG.e("Exception when calling application " + app + " in endpoint " + method + " " + path + "\r\n" + e.InnerException.ToString());
+              exceptionMessage = e.InnerException.ToString();
+            } else { // But if we got a internal exception at AppServer, it will be in the root.
+              LOG.e("Exception when calling application " + app + " in endpoint " + method + " " + path + "\r\n" + e.ToString());
+              exceptionMessage = e.ToString();
+            }
             result.StatusCode = HttpStatusCode.InternalServerError;
             result.ContentType = "text/plain";
-            result.Result = Encoding.UTF8.GetBytes(e.InnerException.ToString());
+            result.Result = Encoding.UTF8.GetBytes(exceptionMessage);
             return result;
           }
         } else {

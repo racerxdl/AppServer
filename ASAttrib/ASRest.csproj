@@ -78,6 +78,7 @@
     <Compile Include="Models\RestRequest.cs" />
     <Compile Include="Models\RestResult.cs" />
     <Compile Include="Processors\RestProcessor.cs" />
+    <Compile Include="Proxy\RestProxy.cs" />
     <Compile Include="Processors\Tools.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Interfaces\IRestExceptionHandler.cs" />

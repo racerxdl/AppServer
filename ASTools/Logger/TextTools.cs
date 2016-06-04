@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ASTools.Logger {
-  public class TextTools {
+  internal class TextTools {
     private static readonly string logFormat = "{0,-19} - {1, -40} - {2, -6}: {3}";
     private static readonly string logFormatNewLine = "                                                                         ";
 

@@ -1,13 +1,12 @@
 ﻿using ASAttrib.Models;
 using ASTools.Logger;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Linq;
 using System.Net;
 using System.Threading;
 
 namespace AppServer.Server {
-  public class HttpServer {
+  internal class HttpServer {
     private readonly HttpListener _listener = new HttpListener();
     private Func<HttpListenerRequest, RestResult> httpProcesser;
     private string listenUrl;

@@ -61,8 +61,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AS\ASApp.cs" />
-    <Compile Include="Class1.cs" />
     <Compile Include="Logger\Logger.cs" />
     <Compile Include="Logger\LogManager.cs" />
     <Compile Include="Logger\TextTools.cs" />
