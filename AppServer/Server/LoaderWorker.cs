@@ -52,7 +52,7 @@ namespace AppServer.Server {
         LOG.d("Trying to load file " + targetPath);
 
         byte[] rawAssembly = loadFile(targetPath);
-        byte[] rawSymbolStore = loadFile(targetPath.Replace(".dll", ".pdb"));
+        byte[] rawSymbolStore = loadFile(targetPath.Replace(".dll", ASTools.Tools.DEBUG_SYMBOLS_EXTENSION));
 
         if (rawSymbolStore != null) {
           assembly = AppDomain.CurrentDomain.Load(rawAssembly, rawSymbolStore);
