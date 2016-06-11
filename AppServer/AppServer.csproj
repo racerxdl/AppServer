@@ -81,9 +81,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ASAttrib\ASRest.csproj">
+    <ProjectReference Include="..\ASAttrib\ASAttrib.csproj">
       <Project>{A98DE288-9DD0-46E1-854A-9AAB9091547B}</Project>
-      <Name>ASRest</Name>
+      <Name>ASAttrib</Name>
     </ProjectReference>
     <ProjectReference Include="..\ASTools\ASTools.csproj">
       <Project>{47AD25A1-D8E2-4CB8-A111-2B55380F83B1}</Project>

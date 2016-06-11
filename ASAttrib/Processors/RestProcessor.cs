@@ -18,11 +18,13 @@ namespace ASAttrib.Processors {
     private Dictionary<string, Dictionary<string, RestCall>> endpoints;
     private Dictionary<string, RestProxy> proxies;
     private Dictionary<string, IRestExceptionHandler> exceptionHandlers;
+    private Dictionary<string, Object> injectables;
 
     public RestProcessor() {
       endpoints = new Dictionary<string, Dictionary<string, RestCall>>();
       proxies = new Dictionary<string, RestProxy>();
       exceptionHandlers = new Dictionary<string, IRestExceptionHandler>();
+      injectables = new Dictionary<string, object>();
     }
 
     public void init(Assembly runningAssembly, string modulesAssembly) {
@@ -35,7 +37,7 @@ namespace ASAttrib.Processors {
         if (t != null) {
           LOG.i("Found REST class " + tClass.Name);
           REST trest = (REST)t;
-          proxies.Add(tClass.Name, new RestProxy(tClass));
+          proxies.Add(tClass.Name, new RestProxy(tClass, injectables));
 
           MethodInfo[] methods = tClass.GetMethods();
           foreach (var methodInfo in methods) {

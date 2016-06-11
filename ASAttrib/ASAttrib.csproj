@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="Attributes\DELETE.cs" />
     <Compile Include="Attributes\HTTPMethod.cs" />
+    <Compile Include="Attributes\Inject.cs" />
     <Compile Include="Attributes\PathParam.cs" />
     <Compile Include="Attributes\POST.cs" />
     <Compile Include="Attributes\GET.cs" />

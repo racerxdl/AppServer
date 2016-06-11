@@ -17,13 +17,32 @@ namespace ASAttrib.Proxy {
     private object instance;
     private Type classType;
 
-    internal RestProxy(Type restClass) {
+    internal RestProxy(Type restClass, Dictionary<string, Object> injectables) {
       instance = Activator.CreateInstance(restClass);
       classType = restClass;
       Attribute t = restClass.GetCustomAttribute(typeof(REST));
       LOG.i("Creating proxy for " + restClass.Name);
       proxyMethods = new Dictionary<string, ProxyMethod>();
       REST trest = (REST)t;
+
+      // Search Injectables to inject
+      FieldInfo[] fields = restClass.GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
+      foreach (FieldInfo field in fields) {
+        if (field.GetCustomAttribute(typeof(Inject)) != null) {
+          Type ft = field.FieldType;
+          Object injectableInstance;
+          if (injectables.ContainsKey(ft.FullName)) {
+            injectableInstance = injectables[ft.FullName];
+          } else {
+            LOG.i("Creating injectable instance for class " + ft.FullName);
+            injectableInstance = Activator.CreateInstance(ft);
+            injectables.Add(ft.Name, injectableInstance);
+          }
+          field.SetValue(instance, injectableInstance);
+        }
+      }
+
+      // Search Methods to Map
       MethodInfo[] methods = restClass.GetMethods();
       foreach (var methodInfo in methods) {
         proxyMethods.Add(methodInfo.Name, new ProxyMethod(methodInfo));
