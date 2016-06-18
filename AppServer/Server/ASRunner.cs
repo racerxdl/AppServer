@@ -19,6 +19,14 @@ namespace AppServer.Server {
       }
     }
 
+    public ASRunner(string listenURL) {
+      server = new HttpServer(listenURL, processHttpCalls);
+      appManager = new ApplicationManager();
+      if (ASTools.Tools.getRunningPlatform() == ASTools.Platform.Windows) {
+        Console.WindowWidth = 180;
+      }
+    }
+
     public void run() {
       server.Run();
       Console.ReadLine();
