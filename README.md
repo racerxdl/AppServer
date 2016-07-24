@@ -2,6 +2,7 @@ C# Application Server - a.k.a. SharpBoss (**WIP**)
 ========================================
 
 [![Build Status](https://travis-ci.org/racerxdl/AppServer.svg?branch=master)](https://travis-ci.org/racerxdl/AppServer)
+[![GPLv3 License](http://img.shields.io/badge/license-GPLv3-brightgreen.svg)](https://tldrlegal.com/license/gnu-general-public-license-v3-\(gpl-3\))
 
 A simple C# Application Server inspired on Redhat JBoss Project.
 
