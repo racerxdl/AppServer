@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="Attributes\DELETE.cs" />
     <Compile Include="Attributes\HTTPMethod.cs" />
+    <Compile Include="Attributes\Inject.cs" />
     <Compile Include="Attributes\PathParam.cs" />
     <Compile Include="Attributes\POST.cs" />
     <Compile Include="Attributes\GET.cs" />
@@ -78,6 +79,7 @@
     <Compile Include="Models\RestRequest.cs" />
     <Compile Include="Models\RestResult.cs" />
     <Compile Include="Processors\RestProcessor.cs" />
+    <Compile Include="Proxy\RestProxy.cs" />
     <Compile Include="Processors\Tools.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Interfaces\IRestExceptionHandler.cs" />

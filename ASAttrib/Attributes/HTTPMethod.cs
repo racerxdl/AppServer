@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace ASAttrib.Attributes {
-  public interface HTTPMethod {
+﻿namespace ASAttrib.Attributes {
+  internal interface HTTPMethod {
 
     string Path {
       get;

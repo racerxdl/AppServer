@@ -7,7 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
-using System.Linq;
+using ASAttrib.Proxy;
 
 namespace ASAttrib.Processors {
   public class RestProcessor {
@@ -16,13 +16,15 @@ namespace ASAttrib.Processors {
     private readonly Type[] RestTypes = new Type[] { typeof(GET), typeof(POST), typeof(PUT), typeof(DELETE) };
 
     private Dictionary<string, Dictionary<string, RestCall>> endpoints;
-    private Dictionary<string, object> instances;
+    private Dictionary<string, RestProxy> proxies;
     private Dictionary<string, IRestExceptionHandler> exceptionHandlers;
+    private Dictionary<string, Object> injectables;
 
     public RestProcessor() {
       endpoints = new Dictionary<string, Dictionary<string, RestCall>>();
-      instances = new Dictionary<string, object>();
+      proxies = new Dictionary<string, RestProxy>();
       exceptionHandlers = new Dictionary<string, IRestExceptionHandler>();
+      injectables = new Dictionary<string, object>();
     }
 
     public void init(Assembly runningAssembly, string modulesAssembly) {
@@ -35,8 +37,8 @@ namespace ASAttrib.Processors {
         if (t != null) {
           LOG.i("Found REST class " + tClass.Name);
           REST trest = (REST)t;
-          object instance = Activator.CreateInstance(tClass);
-          instances.Add(tClass.Name, instance);
+          proxies.Add(tClass.Name, new RestProxy(tClass, injectables));
+
           MethodInfo[] methods = tClass.GetMethods();
           foreach (var methodInfo in methods) {
             foreach (Type rt in RestTypes) {
@@ -44,8 +46,8 @@ namespace ASAttrib.Processors {
               if (rta != null) {
                 RestCall restCall = new RestCall();
                 try {
-                  restCall.methodClass = tClass;
-                  restCall.call = methodInfo;
+                  restCall.className = tClass.Name;
+                  restCall.methodName = methodInfo.Name;
                   restCall.method = (HTTPMethod)rta;
                   restCall.baseRest = trest;
 
@@ -79,12 +81,12 @@ namespace ASAttrib.Processors {
         }
       }
 
-      LOG.i("Initialized " + instances.Count + " REST instances.");
+      LOG.i("Initialized " + proxies.Count + " REST proxies.");
       LOG.i("Initialized " + endpoints.Keys.Count + " REST endpoints.");
       LOG.i("Initialized " + exceptionHandlers.Keys.Count + " Custom Exception Handlers");
     }
 
-    public RestCall getEndPoint(string path, string method) {
+    private RestCall getEndPoint(string path, string method) {
       if (endpoints.ContainsKey(path) && endpoints[path].ContainsKey(method)) {
         return endpoints[path][method];
       }
@@ -102,77 +104,9 @@ namespace ASAttrib.Processors {
 
     public RestResult callEndPoint(string path, string method, RestRequest request) {
       RestCall rc = getEndPoint(path, method);
-      if (instances.ContainsKey(rc.methodClass.Name)) {
-        /**
-         * Parameters Processing
-         * 
-         * For now we're using Reflection to fill the parameters,
-         * but in the future I think it is best to create a proxy class
-         * to the target class, that receives RestRequest and calls the 
-         * subsequent class with the correct parameters. Then we only 
-         * do reflection at the setup
-         */
-        ParameterInfo[] parameters = rc.call.GetParameters();
-        object[] methodParams = new object[parameters.Length];
-        int i = 0;
-        foreach (ParameterInfo param in parameters) {
-          // Try query param
-          Attribute pa = param.GetCustomAttribute(typeof(QueryParam));
-          if (pa != null) {
-            QueryParam q = (QueryParam)pa;
-            string queryName = q.ParamName == null ? param.Name : q.ParamName;
-            string queryData = request.QueryString[queryName];
+      if (proxies.ContainsKey(rc.className)) {
+        object ret = proxies[rc.className].callMethod(rc.methodName, request);
 
-            // If anyone knows a better way to do this. Please say it.
-            // This is ugly
-            if (!typeof(string).IsAssignableFrom(param.ParameterType)) {
-              // Not String Parameter
-              if (typeof(long).IsAssignableFrom(param.ParameterType)) {
-                long output = 0;
-                long.TryParse(queryData, out output);
-                methodParams[i] = output;
-              } else if (typeof(int).IsAssignableFrom(param.ParameterType)) {
-                int output = 0;
-                int.TryParse(queryData, out output);
-                methodParams[i] = output;
-              } else if (typeof(double).IsAssignableFrom(param.ParameterType)) {
-                double output = 0;
-                double.TryParse(queryData, out output);
-                methodParams[i] = output;
-              } else if (typeof(float).IsAssignableFrom(param.ParameterType)) {
-                float output = 0;
-                float.TryParse(queryData, out output);
-                methodParams[i] = output;
-              }
-            } else {
-              methodParams[i] = queryData;
-            }
-
-            i++;
-            continue;
-          }
-
-          // Try Path param
-          pa = param.GetCustomAttribute(typeof(PathParam));
-          if (pa != null) {
-            // TODO: Path Param
-            i++;
-            continue;
-          }
-
-          // If no match to our Attributes, then it is a body data. Try to deserialize
-          if (request.BodyData != null) {
-            if (typeof(string).IsAssignableFrom(param.ParameterType)) {
-              methodParams[i] = request.BodyData;
-            } else {
-              methodParams[i] = JsonConvert.DeserializeObject(request.BodyData, param.ParameterType);
-            }
-          }
-          i++;
-        }
-
-        // Calling the target method
-        object ret = rc.call.Invoke(instances[rc.methodClass.Name], methodParams);
         if (ret is string) {
           return new RestResult((string)ret);
         } else {
