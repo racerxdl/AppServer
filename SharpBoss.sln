@@ -9,8 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpBoss.Tests", "SharpBos
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpBoss.Logging", "SharpBoss.Logging\SharpBoss.Logging.csproj", "{111D2B59-39B2-4B1C-A8B2-04E26735A12B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpBoss.Logging.Tests", "SharpBoss.Logging.Tests\SharpBoss.Logging.Tests.csproj", "{49E4AE98-8253-472D-9396-4715D21C5367}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
