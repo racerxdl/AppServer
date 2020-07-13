@@ -1,0 +1,86 @@
+﻿<#@ template language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+using System;
+using System.Text;
+
+using SharpBoss;
+using SharpBoss.Models;
+using SharpBoss.Attributes;
+using SharpBoss.Attributes.Methods;
+
+namespace <#= Namespace #> {
+  public class <#= Class #>Model {
+    public string name;
+    public int count;
+    public string test;
+  }
+  
+  public class <#= Class #>Processor {
+    public string Name () {
+      return typeof(<#= Class #>Processor).Name;
+    }
+
+    public <#= Class #>Model AddCount (<#= Class #>Model model, int count) {
+      model.count += count;
+      return model;
+    }
+  }
+  
+  public class <#= Class #>CustomException: Exception {
+    public <#= Class #>CustomException(string message) : base(message) { }
+  }
+  
+  [RestExceptionHandler (typeof(<#= Class #>CustomException))]
+  public class <#= Class #>ExceptionHandler : IRestExceptionHandler {
+    public RestResponse HandleException (Exception e) {
+      <#= Class #>CustomException ce = (<#= Class #>CustomException)e;
+
+      var result = new RestResponse ();
+      result.ContentType = "text/plain";
+      result.StatusCode = System.Net.HttpStatusCode.NotAcceptable;
+      result.Result = Encoding.UTF8.GetBytes("Handling CustomException that has a message: " + ce.Message);
+
+      return result;
+    }
+  }
+  
+  [REST("/api")]
+  public class <#= Class #>RestClass {
+    [Inject]
+    private <#= Class #>Processor myInjectedProc = null;
+
+    [GET("/test")]
+    public string hueTest ([QueryParam] string param0, [QueryParam] float param1) {
+      return "GET TO HUEHUE with param: Param0(" + param0 + "), Param1(" + param1 +")";
+    }
+
+    [GET("/inject-test")]
+    public string injTest () {
+      return myInjectedProc.Name ();
+    }
+
+    [POST("/inject-test")]
+    public <#= Class #>Model injTestPost (<#= Class #>Model model) {
+      return myInjectedProc.AddCount (model, 20);
+    }
+
+    [POST("/test")]
+    public <#= Class #>Model hueTest2 (<#= Class #>Model model) {
+      model.count += 100;
+      return model;
+    }
+
+    [GET("/exception-test")]
+    public <#= Class #>Model exceptionTest () {
+      throw new NullReferenceException ("Test of an Exception");
+    }
+
+    [GET("/custom-exception-test")]
+    public <#= Class #>Model customExceptionTest () {
+      throw new <#= Class #>CustomException ("NOOOOOOOOOOOOOOOOOOOOO!");
+    }
+  }
+}
