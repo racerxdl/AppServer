@@ -1,4 +1,5 @@
-﻿using System;
+﻿using EmbedIO;
+using System;
 using System.Collections.Specialized;
 using System.IO;
 using System.Net;
@@ -130,6 +131,40 @@ namespace SharpBoss.Models {
     /// Gets the Uniform Resource Identifier (URI) of the resource that referred the client to the server.
     /// </summary>
     public Uri UrlReferrer { get { return this._urlReferrer; } }
+
+    public RestRequest(IHttpContext context)
+    {
+      this._userAgent = context.Request.UserAgent; // request.UserAgent;
+      this._userHostAddress = context.Request.RemoteEndPoint.Address.ToString();
+      this._userHostName = context.Request.RemoteEndPoint.Address.ToString();
+      //this._userLanguages = context.Request.UserLanguages;
+      this._url = context.Request.Url;
+      this._urlReferrer = context.Request.UrlReferrer;
+      //this._acceptTypes = context.Request.AcceptTypes;
+      this._contentEncoding = context.Request.ContentEncoding;
+      this._contentLength = context.Request.ContentLength64;
+      this._contentType = context.Request.ContentType;
+      //this._cookies = context.Request.Cookies;
+      this._httpMethod = context.Request.HttpMethod;
+      this._isAuthenticated = context.Request.IsAuthenticated;
+      this._isLocal = context.Request.IsLocal;
+      this._isSecureConnection = context.Request.IsSecureConnection;
+      this._isWebSocketRequest = context.Request.IsWebSocketRequest;
+      this._keepAlive = context.Request.KeepAlive;
+      this._queryString = context.Request.QueryString;
+      this._rawUrl = context.Request.RawUrl;
+
+      if (context.Request.HasEntityBody)
+      {
+        using (var body = context.Request.InputStream)
+        {
+          using (var reader = new StreamReader(body, context.Request.ContentEncoding))
+          {
+            this._body = reader.ReadToEnd();
+          }
+        }
+      }
+    }
 
     /// <summary>
     /// Instantiate a new request with listener

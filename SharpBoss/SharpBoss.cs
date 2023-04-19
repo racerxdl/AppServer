@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Specialized;
 using System.Configuration;
+using System.IO;
 using System.Net;
+using System.Security.Policy;
 using System.Text;
-
+using System.Threading.Tasks;
+using EmbedIO;
 using SharpBoss.Logging;
 using SharpBoss.Models;
 using SharpBoss.Workers;
@@ -13,14 +16,14 @@ namespace SharpBoss {
   /// SharBoss main class
   /// </summary>
   public class SharpBoss {
-    HttpServer _server;
+    WebServer _wserver;
     ApplicationLoader _applicationLoader;
     dynamic _appSettings;
 
     private readonly string _defaultListenUrl = @"http://localhost:8080/";
     private readonly string _environmentVariable = "SHARPBOSS_URL";
     private readonly string _configKey = "SHARPBOSS_URL";
-
+    private string _listenURL = "";
     /// <summary>
     /// SharpBoss initializer, the listen URL can be defined on:
     /// <list type="bullet">
@@ -41,7 +44,24 @@ namespace SharpBoss {
       this._applicationLoader = new ApplicationLoader ();
 
       listenUrl = listenUrl + (listenUrl.EndsWith ("/") ? "" : "/");
-      this._server = new HttpServer (listenUrl, ProcessHttpCalls);
+      //this._server = new HttpServer (listenUrl, ProcessHttpCalls);
+      this._wserver = new WebServer(o => o.WithUrlPrefix(listenUrl).WithMode(HttpListenerMode.EmbedIO));
+      this._wserver.WithAction(HttpVerbs.Any, RequestHandlerCallback);
+      this._listenURL = listenUrl;
+    }
+
+    async Task RequestHandlerCallback(IHttpContext context)
+    {
+      var ePath = context.Request.Url.AbsolutePath.Split(
+        new char[] { '/' }, 2, StringSplitOptions.RemoveEmptyEntries
+      );
+
+      var req = new RestRequest(context);
+      RestResponse r = Process(ePath, req);
+      context.Response.StatusCode = ((int)r.StatusCode);
+      context.Response.ContentType = r.ContentType;
+      context.Response.ContentLength64 = r.Result.Length;
+      context.Response.OutputStream.Write(r.Result, 0, r.Result.Length);
     }
 
     /// <summary>
@@ -60,14 +80,18 @@ namespace SharpBoss {
     /// Do the trick, like a boss!
     /// </summary>
     public void Run () {
-      this._server.Run ();
+      Logger.Info("Running SharpBoss WebServer");
+      this._wserver.RunAsync();
     }
 
     /// <summary>
     /// If u did the trick, like a boss. So it's the end D:
     /// </summary>
     public void Stop () {
-      this._server.Stop ();
+      try
+      {
+        this._wserver.Listener.Stop();
+      } catch(Exception e) { }
     }
 
     /// <summary>
@@ -75,7 +99,7 @@ namespace SharpBoss {
     /// </summary>
     /// <returns>Listen URL</returns>
     public string GetHttpServerListenUrl () {
-      return this._server.ListenUrl;
+      return this._listenURL;
     }
 
     /// <summary>
@@ -89,42 +113,59 @@ namespace SharpBoss {
       );
 
       var req = new RestRequest (request);
+      return Process(ePath, req);
+    }
 
-      if (ePath.Length == 0) {
-        return new RestResponse ("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
-      } else {
+    RestResponse Process(string[] ePath, RestRequest req)
+    {
+
+      if (ePath.Length == 0)
+      {
+        return new RestResponse("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
+      }
+      else
+      {
         var path = ePath.Length > 1 ? "/" + ePath[1] : "/";
-        var method = request.HttpMethod;
+        var method = req.HttpMethod;
         var app = ePath[0];
 
-        Logger.Debug (string.Format ("Received request for: APP={0} {1} {2}", app, method, path));
+        Logger.Debug(string.Format("Received request for: APP={0} {1} {2}", app, method, path));
 
-        if (this._applicationLoader.ContainsEndPoint (app, path, method)) {
-          try {
-            return this._applicationLoader.Process (app, path, method, req);
-          } catch (Exception ex) {
-            var response = new RestResponse ();
+        if (this._applicationLoader.ContainsEndPoint(app, path, method))
+        {
+          try
+          {
+            return this._applicationLoader.Process(app, path, method, req);
+          }
+          catch (Exception ex)
+          {
+            var response = new RestResponse();
             var exceptionMessage = "";
 
-            if (ex.InnerException != null) {
-              exceptionMessage = ex.InnerException.ToString ();
-            } else {
-              exceptionMessage = ex.ToString ();
+            if (ex.InnerException != null)
+            {
+              exceptionMessage = ex.InnerException.ToString();
+            }
+            else
+            {
+              exceptionMessage = ex.ToString();
             }
 
-            Logger.Error (string.Format (
+            Logger.Error(string.Format(
               "Exception when calling application {0} in endpoint {1} {2}\r\n{3}",
               app, method, path, exceptionMessage
             ));
 
             response.StatusCode = HttpStatusCode.InternalServerError;
             response.ContentType = "text/plain";
-            response.Result = Encoding.UTF8.GetBytes (exceptionMessage);
+            response.Result = Encoding.UTF8.GetBytes(exceptionMessage);
 
             return response;
           }
-        } else {
-          return new RestResponse ("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
+        }
+        else
+        {
+          return new RestResponse("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
         }
       }
     }
