@@ -49,7 +49,10 @@ namespace SharpBoss {
       this._wserver.WithAction(HttpVerbs.Any, RequestHandlerCallback);
       this._listenURL = listenUrl;
     }
-
+    
+    public void ForceReload()    {
+        this._applicationLoader.ForceReload();
+    }
     async Task RequestHandlerCallback(IHttpContext context)
     {
       var ePath = context.Request.Url.AbsolutePath.Split(

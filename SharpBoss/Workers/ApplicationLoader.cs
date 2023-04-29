@@ -57,7 +57,18 @@ namespace SharpBoss.Workers
             this._watcher.EnableRaisingEvents = true;
             DefineEvents();
         }
-
+        public void ForceReload()
+        {
+            lock (this._appDomains)
+            {
+                Logger.Info("Force reloading apps...");
+                var keys = this._appDomains.Keys.ToList();
+                foreach (var app in keys)
+                {
+                    LoadApplication(app); // Load also unloads first
+                }
+            }
+        }
         /// <summary>
         /// Define all event handlers
         /// </summary>
