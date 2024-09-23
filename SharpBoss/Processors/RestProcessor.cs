@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
-
+using System.Text.Json.Serialization;
 using SharpBoss.Attributes;
 using SharpBoss.Attributes.Methods;
 using SharpBoss.Exceptions;
@@ -25,6 +25,7 @@ namespace SharpBoss.Processors {
     private Dictionary<string, RestProxy> _proxies;
     private Dictionary<string, IRestExceptionHandler> _exceptionHandlers;
     private Dictionary<string, object> _injectables;
+    private JsonSerializerOptions _serializerOptions;
 
     /// <summary>
     /// Create new REST processor
@@ -34,6 +35,7 @@ namespace SharpBoss.Processors {
       this._proxies = new Dictionary<string, RestProxy> ();
       this._exceptionHandlers = new Dictionary<string, IRestExceptionHandler> ();
       this._injectables = new Dictionary<string, object> ();
+      this._serializerOptions = new JsonSerializerOptions() { WriteIndented = true };
     }
 
     /// <summary>
@@ -48,6 +50,12 @@ namespace SharpBoss.Processors {
 
       foreach (var type in types) {
         var restAttribute = type.GetCustomAttribute (typeof (REST));
+
+        if (typeof(JsonConverter<>).IsAssignableFrom(type) || typeof(JsonConverter).IsAssignableFrom(type))
+        {
+          Logger.Info($"Found JsonConverter {type.Name}");
+          _serializerOptions.Converters.Add((JsonConverter)Activator.CreateInstance(type));
+        }
 
         if (restAttribute != null) {
           Logger.Info ("Found REST class " + type.Name);
@@ -137,7 +145,7 @@ namespace SharpBoss.Processors {
         if (response is string) {
           return new RestResponse ((string)response);
         } else {
-          return new RestResponse (JsonSerializer.Serialize (response), "application/json");
+          return new RestResponse (JsonSerializer.Serialize (response, _serializerOptions), "application/json");
         }
       } else {
         return new RestResponse ("Not found", "text/plain", HttpStatusCode.NotFound);

@@ -26,13 +26,12 @@
     <Folder Include="Processors\" />
     <Folder Include="Exceptions\" />
     <Folder Include="Interfaces\" />
-    <Folder Include="Attributes\" />
     <Folder Include="Attributes\Methods\" />
     <Folder Include="Proxies\" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="EmbedIO" Version="3.5.2" />
-    <PackageReference Include="System.Text.Json" Version="6.0.5" />
+    <PackageReference Include="System.Text.Json" Version="7.0.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpBoss.Logging\SharpBoss.Logging.csproj" />
