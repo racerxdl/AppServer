@@ -1,256 +1,164 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text.Json;
-
 using SharpBoss.Attributes;
-using SharpBoss.Models;
 using SharpBoss.Logging;
+using SharpBoss.Models;
+using SharpBoss.Runtime;
 
-namespace SharpBoss.Proxies {
-  /// <summary>
-  /// 
-  /// </summary>
-  internal class RestProxy {
-    private static readonly Type[] _baseTypes = {
-      typeof (int), typeof (float), typeof (long), typeof (double)
-    };
+namespace SharpBoss.Proxies;
 
-    private Dictionary<string, ProxyMethod> _proxyMethods;
-    private object _instance;
-    private Type _classType;
+internal sealed class RestProxy
+{
+    private readonly Dictionary<MethodInfo, ProxyMethod> _proxyMethods = new();
+    private readonly object _instance;
 
-    /// <summary>
-    /// Create a new proxy between request and rest class to inject parameters
-    /// </summary>
-    /// <param name="restClass">Rest Class type</param>
-    /// <param name="injectables">Injectables</param>
-    internal RestProxy (Type restClass, Dictionary<string, Object> injectables) {
-      this._instance = Activator.CreateInstance (restClass);
-      this._classType = restClass;
-      this._proxyMethods = new Dictionary<string, ProxyMethod> ();
+    public RestProxy(
+        Type endpointType,
+        Dictionary<Type, object> injectables,
+        IApplicationJsonSerializer jsonSerializer)
+    {
+        ArgumentNullException.ThrowIfNull(endpointType);
+        ArgumentNullException.ThrowIfNull(injectables);
+        ArgumentNullException.ThrowIfNull(jsonSerializer);
 
-      Logger.Info ("Creating proxy for " + restClass.Name);
-      var restAttribute = restClass.GetCustomAttribute (typeof (REST));
+        _instance = Activator.CreateInstance(endpointType)
+            ?? throw new InvalidOperationException($"Could not create endpoint type '{endpointType.FullName}'.");
+        Logger.Info($"Creating proxy for {endpointType.FullName}.");
 
-      var rest = (REST) restAttribute;
-      var fields = restClass.GetFields (BindingFlags.NonPublic | BindingFlags.Instance);
+        InjectFields(endpointType, injectables);
 
-      foreach (var field in fields) {
-        if (field.GetCustomAttribute (typeof (Inject)) != null) {
-          var fieldType = field.FieldType;
-          object injectableInstance;
+        foreach (var method in endpointType.GetMethods(BindingFlags.Instance | BindingFlags.Public))
+        {
+            if (method.GetCustomAttributes(inherit: true) is not { } attributes
+                || !Array.Exists(attributes, attribute => attribute is IHTTPMethod))
+            {
+                continue;
+            }
 
-          if (injectables.ContainsKey (fieldType.FullName)) {
-            injectableInstance = injectables[fieldType.FullName];
-          } else {
-            Logger.Info ("Creating injectable instance for class " + fieldType.FullName);
-            injectableInstance = Activator.CreateInstance (fieldType);
-            injectables.Add (fieldType.Name, injectableInstance);
-          }
-
-          field.SetValue (this._instance, injectableInstance);
+            _proxyMethods.Add(method, BuildProxyMethod(method, jsonSerializer));
         }
-      }
+    }
 
-      var methods = restClass.GetMethods ();
+    public object? CallMethod(MethodInfo method, RestRequest request)
+    {
+        if (!_proxyMethods.TryGetValue(method, out var proxyMethod))
+        {
+            throw new MissingMethodException(method.DeclaringType?.FullName, method.Name);
+        }
 
-      foreach (var method in methods) {
-        this._proxyMethods.Add (method.Name, new ProxyMethod (method));
+        return method.Invoke(_instance, BuildParameters(proxyMethod, request));
+    }
 
-        foreach (var parameter in method.GetParameters ()) {
-          var restType = ProxyParameterRestType.BODY;
-          string lookName = parameter.Name;
-          Attribute attribute;
-
-          if ((attribute = parameter.GetCustomAttribute (typeof (QueryParam))) != null) {
-            restType = ProxyParameterRestType.QUERY;
-
-            if (((QueryParam)attribute).ParamName != null) {
-              lookName = ((QueryParam)attribute).ParamName;
+    private void InjectFields(Type endpointType, Dictionary<Type, object> injectables)
+    {
+        foreach (var field in endpointType.GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
+        {
+            if (field.GetCustomAttribute<Inject>() is null)
+            {
+                continue;
             }
-          } else if ((attribute = parameter.GetCustomAttribute (typeof (PathParam))) != null) {
-            restType = ProxyParameterRestType.PATH;
 
-            if (((PathParam)attribute).ParamName != null) {
-              lookName = ((PathParam)attribute).ParamName;
+            var fieldType = field.FieldType;
+            if (!injectables.TryGetValue(fieldType, out var injectable))
+            {
+                Logger.Info($"Creating injectable instance for {fieldType.FullName}.");
+                injectable = Activator.CreateInstance(fieldType)
+                    ?? throw new InvalidOperationException($"Could not create injectable type '{fieldType.FullName}'.");
+                injectables.Add(fieldType, injectable);
             }
-          }
 
-          Func<string, object> parser;
-          Type baseType;
+            field.SetValue(_instance, injectable);
+        }
+    }
 
-          if ((baseType = GetBaseType (parameter.ParameterType)) != null) {
-            parser = item => {
-              var property = new object[] { item, Activator.CreateInstance (baseType) };
-              baseType.InvokeMember ("TryParse", BindingFlags.InvokeMethod, null, null, property);
+    private static ProxyMethod BuildProxyMethod(MethodInfo method, IApplicationJsonSerializer jsonSerializer)
+    {
+        var parameters = new List<ProxyParameterData>();
 
-              return property[1];
+        foreach (var parameter in method.GetParameters())
+        {
+            if (parameter.ParameterType == typeof(RestRequest))
+            {
+                parameters.Add(new ProxyParameterData(
+                    ProxyParameterRestType.Request,
+                    parameter,
+                    parameter.Name ?? string.Empty,
+                    Parser: null));
+                continue;
+            }
+
+            var restType = ProxyParameterRestType.Body;
+            var parameterName = parameter.Name ?? string.Empty;
+
+            if (parameter.GetCustomAttribute<QueryParam>() is { } queryParameter)
+            {
+                restType = ProxyParameterRestType.Query;
+                parameterName = queryParameter.ParamName ?? parameterName;
+            }
+            else if (parameter.GetCustomAttribute<PathParam>() is { } pathParameter)
+            {
+                restType = ProxyParameterRestType.Path;
+                parameterName = pathParameter.ParamName ?? parameterName;
+            }
+
+            Func<string, object?> parser = parameter.ParameterType == typeof(string)
+                ? value => value
+                : value => jsonSerializer.Deserialize(value, parameter.ParameterType);
+
+            parameters.Add(new ProxyParameterData(restType, parameter, parameterName, parser));
+        }
+
+        return new ProxyMethod(parameters);
+    }
+
+    private static object?[] BuildParameters(ProxyMethod proxyMethod, RestRequest request)
+    {
+        var callParameters = new object?[proxyMethod.Parameters.Count];
+
+        for (var index = 0; index < proxyMethod.Parameters.Count; index++)
+        {
+            var parameter = proxyMethod.Parameters[index];
+            if (parameter.RestType == ProxyParameterRestType.Request)
+            {
+                callParameters[index] = request;
+                continue;
+            }
+
+            string? parseData = parameter.RestType switch
+            {
+                ProxyParameterRestType.Body => request.Body,
+                ProxyParameterRestType.Query => request.QueryString[parameter.ParameterName],
+                ProxyParameterRestType.Path => null,
+                _ => throw new InvalidOperationException($"Unsupported parameter source '{parameter.RestType}'."),
             };
-          } else if (typeof (string).IsAssignableFrom (parameter.ParameterType)) {
-            parser = item => item;
-          } else {
-            parser = item => JsonSerializer.Deserialize (item, parameter.ParameterType);
-          }
 
-          this._proxyMethods[method.Name].ProxyData.Add (
-            new ProxyParameterData (restType, parameter.ParameterType, lookName, parser)
-          );
-        }
-      }
-    }
-
-    /// <summary>
-    /// Invoke method by name and REST Request from REST Class instance
-    /// </summary>
-    /// <param name="methodName">Method name</param>
-    /// <param name="request">REST Request</param>
-    /// <returns>Return response</returns>
-    public object CallMethod (string methodName, RestRequest request) {
-      return this._proxyMethods[methodName].Method.Invoke (
-        this._instance, BuildParameters (methodName, request)
-      );
-    }
-
-    /// <summary>
-    /// Rrtrieve base type from type
-    /// </summary>
-    /// <param name="type">Type</param>
-    /// <returns>Base Type or null</returns>
-    private static Type GetBaseType (Type type) {
-      try {
-        return _baseTypes
-               .Where (x => x.IsAssignableFrom (type))
-               .ElementAt (0);
-      } catch (ArgumentOutOfRangeException) {
-        return null;
-      }
-    }
-
-    /// <summary>
-    /// Build paramters to send with REST Request
-    /// </summary>
-    /// <param name="methodName">Method name</param>
-    /// <param name="request">REST Request</param>
-    /// <returns>Array of parameters (Body, Path and Query)</returns>
-    private object[] BuildParameters (string methodName, RestRequest request) {
-      var proxyData = this._proxyMethods[methodName].ProxyData;
-      var callParams = new object[proxyData.Count];
-
-      for (var i = 0; i < proxyData.Count; i++) {
-        string parseData = null;
-
-        switch (proxyData[i].RestType) {
-          case ProxyParameterRestType.BODY:
-            parseData = request.Body;
-            break;
-          case ProxyParameterRestType.PATH:
-            // TODO: Implement Path parameters to array
-            break;
-          case ProxyParameterRestType.QUERY:
-            parseData = request.QueryString[proxyData[i].ParameterName];
-            break;
+            if (parseData is not null)
+            {
+                callParameters[index] = parameter.Parser!(parseData);
+            }
+            else if (parameter.Parameter.HasDefaultValue)
+            {
+                callParameters[index] = parameter.Parameter.DefaultValue;
+            }
         }
 
-        if (parseData != null) {
-          callParams[i] = proxyData[i].Parser (parseData);
-        }
-      }
-
-      return callParams;
+        return callParameters;
     }
 
-    /// <summary>
-    /// Proxy definition for REST Class method
-    /// </summary>
-    private class ProxyMethod {
-      private MethodInfo _method;
-      private List<ProxyParameterData> _proxyData;
+    private sealed record ProxyMethod(IReadOnlyList<ProxyParameterData> Parameters);
 
-      /// <summary>
-      /// Create new proxy paramter data for method reflection
-      /// </summary>
-      /// <param name="method">Method info reflection</param>
-      public ProxyMethod (MethodInfo method) {
-        this._method = method;
-        this._proxyData = new List<ProxyParameterData> ();
-      }
+    private sealed record ProxyParameterData(
+        ProxyParameterRestType RestType,
+        ParameterInfo Parameter,
+        string ParameterName,
+        Func<string, object?>? Parser);
 
-      /// <summary>
-      /// Get class method reflection
-      /// </summary>
-      public MethodInfo Method {
-        get { return _method; }
-      }
-
-      /// <summary>
-      /// Retrieve a list of proxy parameter data
-      /// </summary>
-      public List<ProxyParameterData> ProxyData {
-        get { return _proxyData; }
-      }
+    private enum ProxyParameterRestType
+    {
+        Body,
+        Path,
+        Query,
+        Request,
     }
-
-    /// <summary>
-    /// Proxy definition for parameter data
-    /// </summary>
-    private class ProxyParameterData {
-      private ProxyParameterRestType _restType;
-      private Type _parameterType;
-      private string _paramterName;
-      private Func<string, object> _parser;
-
-      /// <summary>
-      /// Create new parameter for proxy injection
-      /// </summary>
-      /// <param name="restType">REST parameter type</param>
-      /// <param name="parameterType">Parameter type</param>
-      /// <param name="paramterName">Name</param>
-      /// <param name="parser">Paramter value parser</param>
-      public ProxyParameterData (ProxyParameterRestType restType, Type parameterType, string paramterName, Func<string, object> parser) {
-        this._restType = restType;
-        this._parameterType = parameterType;
-        this._paramterName = paramterName;
-        this._parser = parser;
-      }
-
-      /// <summary>
-      /// Retrieve REST parameter type
-      /// </summary>
-      public ProxyParameterRestType RestType {
-        get { return _restType; }
-      }
-
-      /// <summary>
-      /// Retrieve parameter type
-      /// </summary>
-      public Type ParameterType {
-        get { return _parameterType; }
-      }
-
-      /// <summary>
-      /// Retrieve parameter name
-      /// </summary>
-      public string ParameterName {
-        get { return _paramterName; }
-      }
-
-      /// <summary>
-      /// Retrieve parameter parser
-      /// </summary>
-      public Func<string, object> Parser {
-        get { return _parser; }
-      }
-    }
-
-    /// <summary>
-    /// Type of REST Parameter
-    /// </summary>
-    private enum ProxyParameterRestType {
-      BODY,
-      PATH,
-      QUERY
-    }
-  }
 }

@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NLog" Version="6.1.4" />
+    <InternalsVisibleTo Include="SharpBoss" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SharpBoss.Runtime.Abstractions\SharpBoss.Runtime.Abstractions.csproj" />
   </ItemGroup>
 </Project>

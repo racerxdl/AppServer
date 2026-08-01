@@ -1,49 +1,24 @@
-﻿using SharpBoss;
+using System;
+using System.Reflection;
 using SharpBoss.Attributes;
 
-namespace SharpBoss.Models {
-  /// <summary>
-  /// REST Call struct
-  /// </summary>
-  internal class RestCall {
-    private string _className;
-    private string _methodName;
-    private IHTTPMethod _method;
-    private REST _restClass;
+namespace SharpBoss.Models;
 
-    public RestCall (string className, string methodName, IHTTPMethod method, REST restClass) {
-      this._className = className;
-      this._methodName = methodName;
-      this._method = method;
-      this._restClass = restClass;
+internal sealed class RestCall
+{
+    public RestCall(Type endpointType, MethodInfo method, IHTTPMethod httpMethod, REST restClass)
+    {
+        EndpointType = endpointType;
+        Method = method;
+        HttpMethod = httpMethod;
+        RestClass = restClass;
     }
 
-    /// <summary>
-    /// Retrieve REST Class name
-    /// </summary>
-    public string ClassName {
-      get { return this._className; }
-    }
+    public Type EndpointType { get; }
 
-    /// <summary>
-    /// Retrieve method name from REST Class
-    /// </summary>
-    public string MethodName {
-      get { return this._methodName; }
-    }
+    public MethodInfo Method { get; }
 
-    /// <summary>
-    /// Retrieve http method name from method
-    /// </summary>
-    public IHTTPMethod HttpMethod {
-      get { return this._method; }
-    }
+    public IHTTPMethod HttpMethod { get; }
 
-    /// <summary>
-    /// Retrieve REST Class attribute
-    /// </summary>
-    public REST RestClass {
-      get { return this._restClass; }
-    }
-  }
+    public REST RestClass { get; }
 }
