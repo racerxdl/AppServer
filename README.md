@@ -1,148 +1,169 @@
-C# Application Server - a.k.a. SharpBoss (**WIP**)
-========================================
+# SharpBoss
 
-[![Build Status](https://travis-ci.org/racerxdl/AppServer.svg?branch=master)](https://travis-ci.org/racerxdl/AppServer)
-[![GPLv3 License](http://img.shields.io/badge/license-GPLv3-brightgreen.svg)](https://tldrlegal.com/license/gnu-general-public-license-v3-\(gpl-3\))
+[![.NET](https://github.com/racerxdl/AppServer/actions/workflows/dotnet-core.yml/badge.svg)](https://github.com/racerxdl/AppServer/actions/workflows/dotnet-core.yml)
+[![GPLv3 License](https://img.shields.io/badge/license-GPLv3-brightgreen.svg)](https://tldrlegal.com/license/gnu-general-public-license-v3-(gpl-3))
 
-A simple C# Application Server inspired on Redhat JBoss Project.
+SharpBoss is a cross-platform .NET 10 library for hosting multiple dynamically loaded HTTP applications.
 
+## Features
 
-Features
-========
+- HTTP hosting through EmbedIO.
+- Atomic hot deployment and removal of application assemblies.
+- Collectible application load contexts with isolated JSON runtime state.
+- Multiple independently named applications.
+- Request body, query parameter, and `RestRequest` metadata binding.
+- Explicit `System.Text.Json` converter registration.
+- Shared field injection through `[Inject]`.
+- Application-specific exception handlers.
+- Sanitized unhandled-error responses with a request reference; full details remain in server logs.
+- Owned asynchronous lifecycle and cancellation.
 
-So far we have:
+## Build and test
 
-*   Working HTTP Server
-*   Hot-Deploy / Un-deploy Assemblies
-*   Log support
-*   Multiple Applications
-*   Exception Handling support with Debug Symbols Support (if provided on the app folder)
-*   JSON Serializer for Object Return in REST calls
-*   **Custom Exception Handlers**
-*   Argument Deserialization for REST calls 
-*   Dependency Injection with **Inject** attribute
+Install a .NET 10 SDK, then run:
 
-TODO
-======
+```sh
+dotnet build SharpBoss.sln --configuration Release
+dotnet test SharpBoss.Tests/SharpBoss.Tests.csproj --configuration Release
+```
 
-*   REST Path Param support (**WIP**)
-*   Better threading for multiple apps
-*   **NHibernate Services** Support with Automatic Session Open / Close / Exception Handler
-*   Unit Tests to ensure everything is OK
+`global.json` pins the supported SDK feature band and permits the latest patch in that band.
 
-How it works
-=============
+## Host SharpBoss
 
-If you have ever used Redhat JBoss, it is pretty similar but for .NET. So basically you create a `Library Project` that uses the **ASAttrib** REST attributes to make REST Endpoint calls. 
+Reference `SharpBoss/SharpBoss.csproj` from a .NET 10 executable and own the server for its full lifetime:
 
-The output `.dll` file should be put inside `apps/YOUR_APP_FOLDER` to be deployed. It can either be before executing the AppServer or after it (Hot-Deploy). The assemblies will be automatically copied to a folder called `deployed` to avoid filesystem locking issues. In this way, you can also update the `.dll` assembly anytime, and the AppServer will be automatically reload it. 
+```csharp
+using SharpBoss;
 
-The AppServer handles unhandled exceptions by logging and returning the `StackTrace` of the exception. If a `.pdb` file is available, it will also shows the source file and line number of the crash.
+var options = new SharpBossOptions
+{
+    ApplicationsDirectory = Path.Combine(AppContext.BaseDirectory, "apps"),
+    DeploymentDirectory = Path.Combine(AppContext.BaseDirectory, "deployed"),
+};
 
-How to use REST Attributes
-==========================
+await using var server = new SharpBoss.SharpBoss(
+    "http://localhost:8080/",
+    options: options);
 
-This is actually pretty simple. Just create a Class and put the `REST("/mypath")` attribute on it to mark it as a REST Endpoint Class. In the methods of that class you can anotate with `GET("/endpoint")`, `POST("/endpoint")`, `PUT("/endpoint")`, `DELETE("/endpoint")`. The method should receive a `RestRequest` object that contains the Request Parameters and can return either `string` or a `object` that will be JSON serialized. The method can also throw an exception to indicate an error. The AppServer will return a HTTP Status Code 500 with the StackTrace as message. 
+await server.RunAsync(shutdownToken);
+```
 
-The SampleApp Example:
+The listen URL is resolved in this order:
 
-```cs
-namespace SampleApp {
-  [Rest("/hue")]
-  public class MyRestSample {
+1. The constructor's `listenUrl` argument.
+2. The `SHARPBOSS_URL` environment variable.
+3. The `SHARPBOSS_URL` entry in the constructor's `appSettings` dictionary.
+4. `http://localhost:8080/`.
+
+`StopAsync` cancels and observes the server lifetime task. A `SharpBoss` instance can be started once.
+
+## Deploy an application
+
+Build an application as a .NET 10 class library referencing SharpBoss. Put its managed assemblies and dependencies in one subdirectory:
+
+```text
+apps/
+└── sampleapp/
+    ├── SampleApp.dll
+    └── SampleApp.pdb
+```
+
+The directory name is the application's URL prefix. SharpBoss copies each generation to a unique directory under `deployed`, validates it completely, and swaps it into service atomically. A failed reload leaves the previous generation active. File changes trigger a debounced reload; hosts can also call `ForceReload()`.
+
+## Define endpoints
+
+```csharp
+using SharpBoss.Attributes;
+using SharpBoss.Attributes.Methods;
+using SharpBoss.Models;
+
+namespace SampleApp;
+
+public sealed class Counter
+{
+    public int Value { get; set; }
+}
+
+[REST("/api")]
+public sealed class SampleEndpoint
+{
     [Inject]
-    private TestProc myInjectedProc;
-    
-    [GET("/inject-test")]
-    public string injTest() {
-      return myInjectedProc.myName();
-    }
+    private Counter _counter = null!;
 
-    [POST("/inject-test")]
-    public TestModel injTestPost(TestModel model) {
-      return myInjectedProc.addCount(model, 20);
-    }
-
-    [GET("/test")]
-    public string hueTest([QueryParam] string param0, [QueryParam] float param1) {
-      return "GET TO HUEHUE with param: Param0(" + param0 + "), Param1(" + param1 +")";
-    }
-    
-    [POST("/test")]
-    public TestModel hueTest2(TestModel model) {
-      model.count += 100;
-      return model;
-    }
-
-    [GET("/exception-test")]
-    public TestModel exceptionTest() {
-      throw new NullReferenceException("Test of an Exception");
-    }
-
-    [GET("/custom-exception-test")]
-    public TestModel customExceptionTest() {
-      throw new CustomException("NOOOOOOOOOOOOOOOOOOOOO!");
-    }
-  }
-}
-```
-This will create the endpoints that will be described in the next section.
-
-
-How to use Custom Exception Handler
-===================================
-
-Also it is very simple. Just create a class that implements the interface `IRestExceptionHandler` and put a attribute `[RestExceptionHandler(typeof(TheExceptionYouWantToHandle))]` on it and you're good to go. Example:
-
-```cs
-namespace SampleApp {
-  [RestExceptionHandler(typeof(CustomException))]
-  public class MyCustomExceptionHandler : IRestExceptionHandler {
-    public RestResult handleException(Exception e) {
-      CustomException ce = (CustomException)e;    //  The Custom Exception handler will only be called with the correct type of exception
-
-      RestResult result = new RestResult();
-      result.ContentType = "text/plain";
-      result.StatusCode = System.Net.HttpStatusCode.NotAcceptable;
-      result.Result = Encoding.UTF8.GetBytes("Handling CustomException that has a message: " + ce.Message);
-
-      return result;
-    }
-  }
-}
-```
-
-Testing locally
-===============
-
-1. Compile the Solution
-2. Create a folder `apps` in the `AppServer.exe` folder.
-3. Create a folder `sampleapp` in `apps` folder
-4. Copy the `SampleApp.dll` and `SampleApp.pdb` file from the `SampleApp` project to `apps/sampleapp` folder.
-5. Run `AppServer.exe`
-
-You will have some endpoints available:
-
-*   `GET` **/sampleapp/hue/test?param0=SomeString&param1=30,5**
-    *   This will return a string `"GET TO HUEHUE with param: Param0(SomeString), Param1(30,5)"` as `text/plain`
-*   `POST` **/sampleapp/hue/test**
-    * Post with a JSON like this: 
-    ```json
-      {
-        "name":"Lucas",
-        "count":10,
-        "test":"HUEHUE"
-      }
-    ```
-    * The response will be this:
-    ```json
+    [GET("/hello")]
+    public string Hello([QueryParam("name")] string name, RestRequest request)
     {
-      "name":"Lucas",
-      "count":110,
-      "test":"HUEHUE"
+        _counter.Value++;
+        return $"Hello {name} from {request.UserHostName}; call {_counter.Value}.";
     }
-    ```
-*   `GET` **/sampleapp/hue/exception-test**
-    *   This will throw a test `NullReferenceException` with the message `Test of an Exception`
-*   `GET` **/sampleapp/hue/custom-exception-test**
-    *   This will throw a test `CustomException` that will be handled by MyCustomExceptionHandler and will output `Handling CustomException that has a message: NOOOOOOOOOOOOOOOOOOOOO!`
+
+    [POST("/echo")]
+    public Message Echo(Message message) => message;
+}
+
+public sealed record Message(string Text);
+```
+
+This application exposes:
+
+- `GET /sampleapp/api/hello?name=Lucas`
+- `POST /sampleapp/api/echo`
+
+Strings are returned as `text/plain`. Other return values are serialized as `application/json`. Non-string parameters without `[QueryParam]` are deserialized from the request body. A `RestRequest` parameter receives immutable request metadata, including headers, cookies, query values, host, languages, remote endpoint, and body.
+
+Fields marked `[Inject]` are instantiated once per application generation and shared by exact field type across endpoint classes.
+
+## Register JSON converters
+
+Converters are opt-in. Mark concrete, closed `JsonConverter` implementations that have a public parameterless constructor:
+
+```csharp
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using SharpBoss.Attributes;
+
+[RestJsonConverter]
+public sealed class MessageConverter : JsonConverter<Message>
+{
+    public override Message Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options) => new(reader.GetString() ?? string.Empty);
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        Message value,
+        JsonSerializerOptions options) => writer.WriteStringValue(value.Text);
+}
+```
+
+The same ordered converter set is used for request deserialization and response serialization. Use `[RestJsonConverter(order)]` when converter precedence matters. Unmarked converter types are ignored; invalid marked converters reject the new generation.
+
+## Handle application exceptions
+
+```csharp
+using System.Net;
+using SharpBoss;
+using SharpBoss.Attributes;
+using SharpBoss.Models;
+
+public sealed class UnknownMessageException : Exception
+{
+    public UnknownMessageException(string message)
+        : base(message)
+    {
+    }
+}
+
+[RestExceptionHandler(typeof(UnknownMessageException))]
+public sealed class UnknownMessageHandler : IRestExceptionHandler
+{
+    public RestResponse HandleException(Exception exception) => new(
+        exception.Message,
+        "text/plain",
+        HttpStatusCode.NotFound);
+}
+```
+
+SharpBoss chooses the most specific registered handler while walking the exception's base types. Unhandled exceptions are logged and returned as HTTP 500 with only `Internal server error. Reference: <request-id>` in the response body.

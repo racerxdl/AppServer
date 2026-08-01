@@ -1,31 +1,17 @@
-﻿using System;
+using System;
 
-namespace SharpBoss.Attributes {
-  /// <summary>
-  /// Define expected request path parameter
-  /// </summary>
-  [AttributeUsage (AttributeTargets.Parameter)]
-  public class PathParam : Attribute {
-    private string _paramName;
+namespace SharpBoss.Attributes;
 
-    /// <summary>
-    /// Create new request path parameter without name
-    /// </summary>
-    public PathParam () : this (null) { }
-
-    /// <summary>
-    /// Create new request path parameter with name
-    /// </summary>
-    /// <param name="paramName">Query string parameter name</param>
-    public PathParam (string paramName) {
-      this._paramName = paramName;
+/// <summary>
+/// Binds an endpoint argument from a request path parameter.
+/// </summary>
+[AttributeUsage(AttributeTargets.Parameter)]
+public sealed class PathParam : Attribute
+{
+    public PathParam(string? paramName = null)
+    {
+        ParamName = paramName;
     }
 
-    /// <summary>
-    /// Retrieve parameter name from query string
-    /// </summary>
-    public string ParamName {
-      get { return _paramName; }
-    }
-  }
+    public string? ParamName { get; }
 }

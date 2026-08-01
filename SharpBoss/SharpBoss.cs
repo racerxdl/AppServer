@@ -1,193 +1,270 @@
-﻿using System;
-using System.Collections.Specialized;
-using System.Configuration;
-using System.IO;
+using System;
+using System.Collections.Generic;
 using System.Net;
-using System.Security.Policy;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using EmbedIO;
 using SharpBoss.Logging;
 using SharpBoss.Models;
 using SharpBoss.Workers;
 
-namespace SharpBoss {
-  /// <summary>
-  /// SharBoss main class
-  /// </summary>
-  public class SharpBoss {
-    WebServer _wserver;
-    ApplicationLoader _applicationLoader;
-    dynamic _appSettings;
+namespace SharpBoss;
 
-    private readonly string _defaultListenUrl = @"http://localhost:8080/";
-    private readonly string _environmentVariable = "SHARPBOSS_URL";
-    private readonly string _configKey = "SHARPBOSS_URL";
-    private string _listenURL = "";
+/// <summary>
+/// Hosts dynamically loaded SharpBoss applications over HTTP.
+/// </summary>
+public sealed class SharpBoss : IDisposable, IAsyncDisposable
+{
+    private const string DefaultListenUrl = "http://localhost:8080/";
+    private const string ListenUrlSetting = "SHARPBOSS_URL";
+
+    private readonly WebServer _webServer;
+    private readonly ApplicationLoader _applicationLoader;
+    private readonly string _listenUrl;
+    private readonly object _lifecycleGate = new();
+    private CancellationTokenSource? _runCancellation;
+    private Task? _runTask;
+    private bool _hasStarted;
+    private int _disposed;
+
     /// <summary>
-    /// SharpBoss initializer, the listen URL can be defined on:
-    /// <list type="bullet">
-    ///   <item>On environment: <b>SHARPBOSS_URL</b></item>
-    ///   <item>On config as: <b>SHARPBOSS_URL</b></item>
-    ///   <item>On constructor argument: <b>listenUrl</b></item>
-    /// </list>
+    /// Creates a server. Explicit URL, environment, settings, and the default URL are checked in that order.
     /// </summary>
-    /// <param name="listenUrl">Listen URL for base endpoint</param>
-    /// <returns>New SharpBoss instance</returns>
-    public SharpBoss (string listenUrl = null, dynamic appSettings = null) {
-      SetAppSettings (appSettings);
-
-      if (listenUrl == null) {
-        listenUrl = GetListenUrl ();
-      }
-
-      this._applicationLoader = new ApplicationLoader ();
-
-      listenUrl = listenUrl + (listenUrl.EndsWith ("/") ? "" : "/");
-      //this._server = new HttpServer (listenUrl, ProcessHttpCalls);
-      this._wserver = new WebServer(o => o.WithUrlPrefix(listenUrl).WithMode(HttpListenerMode.EmbedIO));
-      this._wserver.WithAction(HttpVerbs.Any, RequestHandlerCallback);
-      this._listenURL = listenUrl;
-    }
-    
-    public void ForceReload()    {
-        this._applicationLoader.ForceReload();
-    }
-    async Task RequestHandlerCallback(IHttpContext context)
+    public SharpBoss(
+        string? listenUrl = null,
+        IReadOnlyDictionary<string, string>? appSettings = null,
+        SharpBossOptions? options = null)
     {
-      var ePath = context.Request.Url.AbsolutePath.Split(
-        new char[] { '/' }, 2, StringSplitOptions.RemoveEmptyEntries
-      );
+        options ??= new SharpBossOptions();
+        options.Validate();
 
-      var req = new RestRequest(context);
-      RestResponse r = Process(ePath, req);
-      context.Response.StatusCode = ((int)r.StatusCode);
-      context.Response.ContentType = r.ContentType;
-      context.Response.ContentLength64 = r.Result.Length;
-      context.Response.OutputStream.Write(r.Result, 0, r.Result.Length);
+        _listenUrl = NormalizeListenUrl(GetListenUrl(listenUrl, appSettings));
+        _applicationLoader = new ApplicationLoader(options);
+        _webServer = new WebServer(configuration => configuration
+                .WithUrlPrefix(_listenUrl)
+                .WithMode(HttpListenerMode.EmbedIO))
+            .WithAction(HttpVerbs.Any, RequestHandlerCallback);
     }
 
     /// <summary>
-    /// Define App settings collection when using configuration file
+    /// Forces every application directory to be reloaded atomically.
     /// </summary>
-    /// <param name="appSettings">Application settings collection</param>
-    private void SetAppSettings (dynamic appSettings = null) {
-      if (appSettings == null) {
-        this._appSettings = ConfigurationManager.AppSettings;
-      } else {
-        this._appSettings = appSettings;
-      }
-    }
-
-    /// <summary>
-    /// Do the trick, like a boss!
-    /// </summary>
-    public void Run () {
-      Logger.Info("Running SharpBoss WebServer");
-      this._wserver.RunAsync();
-    }
-
-    /// <summary>
-    /// If u did the trick, like a boss. So it's the end D:
-    /// </summary>
-    public void Stop () {
-      try
-      {
-        this._wserver.Listener.Stop();
-      } catch(Exception e) { }
-    }
-
-    /// <summary>
-    /// Retrieve HTTP Server Listen URL
-    /// </summary>
-    /// <returns>Listen URL</returns>
-    public string GetHttpServerListenUrl () {
-      return this._listenURL;
-    }
-
-    /// <summary>
-    /// Process all HTTP calls and return the request response
-    /// </summary>
-    /// <param name="request">Http Listener</param>
-    /// <returns>Rest response from request</returns>
-    RestResponse ProcessHttpCalls (HttpListenerRequest request) {
-      var ePath = request.Url.AbsolutePath.Split (
-        new char[] { '/' }, 2, StringSplitOptions.RemoveEmptyEntries
-      );
-
-      var req = new RestRequest (request);
-      return Process(ePath, req);
-    }
-
-    RestResponse Process(string[] ePath, RestRequest req)
+    public void ForceReload()
     {
+        ThrowIfDisposed();
+        _applicationLoader.ForceReload();
+    }
 
-      if (ePath.Length == 0)
-      {
-        return new RestResponse("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
-      }
-      else
-      {
-        var path = ePath.Length > 1 ? "/" + ePath[1] : "/";
-        var method = req.HttpMethod;
-        var app = ePath[0];
+    /// <summary>
+    /// Starts the server and returns its lifetime task.
+    /// </summary>
+    public Task RunAsync(CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
 
-        Logger.Debug(string.Format("Received request for: APP={0} {1} {2}", app, method, path));
-
-        if (this._applicationLoader.ContainsEndPoint(app, path, method))
+        lock (_lifecycleGate)
         {
-          try
-          {
-            return this._applicationLoader.Process(app, path, method, req);
-          }
-          catch (Exception ex)
-          {
-            var response = new RestResponse();
-            var exceptionMessage = "";
-
-            if (ex.InnerException != null)
+            if (_hasStarted)
             {
-              exceptionMessage = ex.InnerException.ToString();
-            }
-            else
-            {
-              exceptionMessage = ex.ToString();
+                throw new InvalidOperationException("A SharpBoss server instance can only be started once.");
             }
 
-            Logger.Error(string.Format(
-              "Exception when calling application {0} in endpoint {1} {2}\r\n{3}",
-              app, method, path, exceptionMessage
-            ));
-
-            response.StatusCode = HttpStatusCode.InternalServerError;
-            response.ContentType = "text/plain";
-            response.Result = Encoding.UTF8.GetBytes(exceptionMessage);
-
-            return response;
-          }
+            _hasStarted = true;
+            _runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _runTask = _webServer.RunAsync(_runCancellation.Token);
+            _ = _runTask.ContinueWith(
+                static task => Logger.Error("The SharpBoss web server stopped unexpectedly.", task.Exception!.GetBaseException()),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default);
+            Logger.Info($"SharpBoss is listening at {_listenUrl}.");
+            return _runTask;
         }
-        else
-        {
-          return new RestResponse("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
-        }
-      }
     }
 
     /// <summary>
-    /// Retrieve base endpoint from configuration/environment/default
+    /// Starts the server without blocking the calling thread.
     /// </summary>
-    /// <returns>Listen URL</returns>
-    private string GetListenUrl () {
-      var environmentVariable = Environment.GetEnvironmentVariable (_environmentVariable);
-      var configValue = this._appSettings[_configKey];
-
-      if (environmentVariable != null) {
-        return environmentVariable;
-      } else if (configValue != null) {
-        return configValue.Value;
-      }
-
-      return _defaultListenUrl;
+    public void Run()
+    {
+        _ = RunAsync();
     }
-  }
+
+    /// <summary>
+    /// Stops the server and observes its lifetime task.
+    /// </summary>
+    public Task StopAsync()
+    {
+        return StopCoreAsync();
+    }
+
+    /// <summary>
+    /// Stops the server synchronously.
+    /// </summary>
+    public void Stop()
+    {
+        StopCoreAsync().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Gets the normalized HTTP listen URL.
+    /// </summary>
+    public string GetHttpServerListenUrl()
+    {
+        return _listenUrl;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        await StopCoreAsync().ConfigureAwait(false);
+        _webServer.Dispose();
+        _applicationLoader.Dispose();
+    }
+
+    internal WeakReference? LastRetiredLoadContext => _applicationLoader.LastRetiredLoadContext;
+
+    internal void CleanupRetiredApplications()
+    {
+        _applicationLoader.CleanupRetiredApplications();
+    }
+
+    private async Task RequestHandlerCallback(IHttpContext context)
+    {
+        RestResponse response;
+
+        try
+        {
+            var request = await RestRequest.CreateAsync(context).ConfigureAwait(false);
+            response = Process(request);
+        }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Logger.Error($"Request '{context.Id}' failed.", exception);
+            response = new RestResponse(
+                $"Internal server error. Reference: {context.Id}",
+                "text/plain",
+                HttpStatusCode.InternalServerError);
+        }
+
+        context.Response.StatusCode = (int)response.StatusCode;
+        context.Response.ContentType = response.ContentType;
+        context.Response.ContentLength64 = response.Result.Length;
+        await context.Response.OutputStream
+            .WriteAsync(response.Result.AsMemory(), context.CancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private RestResponse Process(RestRequest request)
+    {
+        var endpointPath = request.Url.AbsolutePath.Split('/', 2, StringSplitOptions.RemoveEmptyEntries);
+        if (endpointPath.Length == 0)
+        {
+            return new RestResponse("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
+        }
+
+        var applicationName = endpointPath[0];
+        var path = endpointPath.Length > 1 ? "/" + endpointPath[1] : "/";
+        Logger.Debug($"Received request for APP={applicationName} {request.HttpMethod} {path}.");
+
+        return _applicationLoader.TryProcess(
+            applicationName,
+            path,
+            request.HttpMethod,
+            request,
+            out var response)
+                ? response!
+                : new RestResponse("No such endpoint.", "text/plain", HttpStatusCode.NotFound);
+    }
+
+    private async Task StopCoreAsync()
+    {
+        Task? runTask;
+        CancellationTokenSource? cancellation;
+
+        lock (_lifecycleGate)
+        {
+            runTask = _runTask;
+            cancellation = _runCancellation;
+            cancellation?.Cancel();
+        }
+
+        if (runTask is not null)
+        {
+            try
+            {
+                await runTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellation?.IsCancellationRequested == true)
+            {
+            }
+        }
+
+        lock (_lifecycleGate)
+        {
+            if (ReferenceEquals(runTask, _runTask))
+            {
+                _runTask = null;
+                _runCancellation = null;
+                cancellation?.Dispose();
+            }
+        }
+    }
+
+    private static string GetListenUrl(
+        string? explicitListenUrl,
+        IReadOnlyDictionary<string, string>? appSettings)
+    {
+        if (explicitListenUrl is not null)
+        {
+            return explicitListenUrl;
+        }
+
+        var environmentValue = Environment.GetEnvironmentVariable(ListenUrlSetting);
+        if (!string.IsNullOrWhiteSpace(environmentValue))
+        {
+            return environmentValue;
+        }
+
+        if (appSettings is not null
+            && appSettings.TryGetValue(ListenUrlSetting, out var configuredValue)
+            && !string.IsNullOrWhiteSpace(configuredValue))
+        {
+            return configuredValue;
+        }
+
+        return DefaultListenUrl;
+    }
+
+    private static string NormalizeListenUrl(string listenUrl)
+    {
+        if (!Uri.TryCreate(listenUrl, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new ArgumentException($"'{listenUrl}' is not a valid absolute HTTP URL.", nameof(listenUrl));
+        }
+
+        return listenUrl.EndsWith("/", StringComparison.Ordinal) ? listenUrl : listenUrl + "/";
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+    }
 }
